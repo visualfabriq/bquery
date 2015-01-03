@@ -1,14 +1,14 @@
+# internal imports
+import ctable_ext
+
+# external imports
 import numpy as np
-# todo: importing it different way?
-# import bcolz.carray_ext
-# import bcolz.ctable
 import bcolz
-from bcolz import utils, attrs, array2string, carray_ext, ctable_ext, ctable
 from collections import namedtuple
 import os
 
 
-class ctableExtCls(ctable):
+class ctable(bcolz.ctable):
     def where(self, expression, outcols=None, limit=None, skip=0):
         """
         where(expression, outcols=None, limit=None, skip=0)
@@ -102,11 +102,11 @@ class ctableExtCls(ctable):
 
             # create cache if needed
             if refresh or not os.path.exists(col_factor_rootdir):
-                carray_factor = carray_ext.carray([], dtype='int64', expectedlen=self.size,
+                carray_factor = bcolz.carray([], dtype='int64', expectedlen=self.size,
                                                     rootdir=col_factor_rootdir, mode='w')
                 _, values = ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
-                carray_values = carray_ext.carray(values.values(), dtype=self[col].dtype,
+                carray_values = bcolz.carray(values.values(), dtype=self[col].dtype,
                                                   rootdir=col_values_rootdir, mode='w')
                 carray_values.flush()
 
@@ -170,12 +170,12 @@ def factorize_groupby_cols(ctable_, groupby_cols):
             col_values_rootdir = col_rootdir + '.values'
             if os.path.exists(col_factor_rootdir):
                 cached = True
-                col_factor_carray = carray_ext.carray(rootdir=col_factor_rootdir, mode='r')
-                col_values_carray = carray_ext.carray(rootdir=col_values_rootdir, mode='r')
+                col_factor_carray = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
+                col_values_carray = bcolz.carray(rootdir=col_values_rootdir, mode='r')
 
         if not cached:
             col_factor_carray, values = ctable_ext.factorize(ctable_[col])
-            col_values_carray = carray_ext.carray(values.values(), dtype=ctable_[col].dtype)
+            col_values_carray = bcolz.carray(values.values(), dtype=ctable_[col].dtype)
 
         factor_list.append(col_factor_carray)
         values_list.append(col_values_carray)
@@ -407,6 +407,6 @@ def where_terms(ctable_, term_list):
 
     if eval_list:
         # convert boolarr back to carray
-        boolarr = carray_ext.carray(boolarr)
+        boolarr = bcolz.carray(boolarr)
 
     return boolarr
