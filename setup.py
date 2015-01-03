@@ -60,8 +60,8 @@ def check_import(pkgname, pkgver):
 
 # The minimum version of Cython required for generating extensions
 min_cython_version = '0.20'
-# The minimum version of NumPy required
-min_bcolz_version = '1.7'
+# The minimum version of bcolz required
+min_bcolz_version = '0.7.3.dev'
 
 
 # Check if Cython is installed or not (requisite)
@@ -82,10 +82,8 @@ else:
     print("* Found %(pkgname)s %(pkgver)s package installed."
           % {'pkgname': 'Cython', 'pkgver': cur_cython_version})
 
-# todo: check cython and bcolz
-# Check for cython
 #  Check for bcolz
-# check_import('bcolz', min_bcolz_version)
+check_import('bcolz', min_bcolz_version)
 
 
 ########### End of checks ##########
