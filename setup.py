@@ -108,7 +108,6 @@ inc_dirs = ['bquery']
 lib_dirs = []
 libs = []
 def_macros = []
-sources = ["bquery/carray_ext.pyx", "bquery/khash.pxd"]
 sources_ctable = ["bquery/ctable_ext.pyx"]
 
 # Include NumPy header dirs
