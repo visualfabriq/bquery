@@ -6,6 +6,8 @@ python:
 # TODO: should python 3.4 be supported?
 #- 3.4
 install:
+- pip install nose
+- pip install numpy
 - pip install cython
 - git clone https://github.com/esc/bcolz.git
 - cd bcolz
@@ -14,6 +16,6 @@ install:
 - export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 - python setup.py build_ext --inplace
 script:
-- python -c "import bquery; bquery.test()"
+- nosetests bquery -s
 notifications:
 email: false
