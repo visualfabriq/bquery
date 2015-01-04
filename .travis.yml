@@ -1,0 +1,19 @@
+language: python
+python:
+- 2.6
+- 2.7
+- 3.4
+install:
+- pip install cython
+- git clone https://github.com/esc/bcolz.git
+- cd bcolz
+- git checkout pxd_v3
+- python setup.py build_ext --inplace
+- export PYTHONPATH=./bcolz:${PYTHONPATH}
+- cd ..
+- python setup.py build_ext --inplace
+# TODO: define some tests
+#script:
+#- python -c "import bcolz; bcolz.test()"
+notifications:
+email: false
