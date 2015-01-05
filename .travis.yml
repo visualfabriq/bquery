@@ -3,7 +3,8 @@ python:
 # TODO: should python 2.6 be supported?
 #- 2.6
 - 2.7
-- 3.4
+# TODO: should python 3.4 be supported?
+#- 3.4
 install:
 - pip install cython
 - git clone https://github.com/esc/bcolz.git
