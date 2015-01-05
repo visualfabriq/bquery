@@ -12,8 +12,7 @@ install:
 - export PYTHONPATH=./bcolz:${PYTHONPATH}
 - cd ..
 - python setup.py build_ext --inplace
-# TODO: define some tests
-#script:
-#- python -c "import bcolz; bcolz.test()"
+script:
+- python -c "import bquery; bquery.test()"
 notifications:
 email: false

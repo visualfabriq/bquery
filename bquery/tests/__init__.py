@@ -1,0 +1,1 @@
+from bquery.tests.all import test
