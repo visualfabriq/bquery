@@ -94,7 +94,6 @@ class TestCtable():
                          (groupby over multiple rows results
                          into multiple groups)
         """
-        # TODO: check group order
         random.seed(1)
 
         groupby_cols = ['f0', 'f1', 'f2']
