@@ -83,7 +83,7 @@ else:
           % {'pkgname': 'Cython', 'pkgver': cur_cython_version})
 
 #  Check for bcolz
-check_import('bcolz', min_bcolz_version)
+# check_import('bcolz', min_bcolz_version)
 
 
 ########### End of checks ##########
