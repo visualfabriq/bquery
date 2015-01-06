@@ -88,7 +88,6 @@ class TestCtable():
 
         assert_list_equal(list(result_bcolz['f0']), uniquekeys)
 
-    @SkipTest
     def test_groupby_02(self):
         """
         test_groupby_02: Test groupby's group creation
@@ -125,7 +124,8 @@ class TestCtable():
         print uniquekeys
 
         assert_list_equal(
-            [list(x) for x in result_bcolz[groupby_cols]], result_itt)
+            sorted([list(x) for x in result_bcolz[groupby_cols]]),
+            sorted(uniquekeys))
 
     def test_groupby_03(self):
         """
