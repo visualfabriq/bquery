@@ -17,6 +17,6 @@ install:
 - export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 - python setup.py build_ext --inplace
 script:
-- nosetests bquery -s
+- nosetests bquery
 notifications:
 email: false
