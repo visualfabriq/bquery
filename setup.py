@@ -139,5 +139,5 @@ setup(name="bquery",
                     extra_link_args=LFLAGS,
                     extra_compile_args=CFLAGS),
       ],
-
+      packages=['bquery', 'bquery.tests'],
 )
