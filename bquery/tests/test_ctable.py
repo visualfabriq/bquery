@@ -5,6 +5,7 @@ import itertools
 import tempfile
 import numpy as np
 import shutil
+import nose
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
 import itertools as itt
@@ -225,3 +226,6 @@ class TestCtable():
         assert_list_equal(
             sorted([list(x) for x in result_bcolz]),
             sorted(ref))
+
+if __name__ == '__main__':
+    nose.main()
