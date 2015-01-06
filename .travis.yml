@@ -8,7 +8,7 @@ python:
 install:
 - pip install nose
 - pip install numpy
-- pip install cython
+- pip install --install-option='--no-cython-compile' cython
 - git clone https://github.com/esc/bcolz.git
 - cd bcolz
 - git checkout pxd_v3
