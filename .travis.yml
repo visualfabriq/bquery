@@ -12,6 +12,7 @@ install:
 - git clone https://github.com/esc/bcolz.git
 - cd bcolz
 - git checkout pxd_v3
+- python setup.py build_ext --inplace
 - cd ..
 - export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 - python setup.py build_ext --inplace
