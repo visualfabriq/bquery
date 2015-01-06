@@ -5,8 +5,7 @@ A query and aggregation framework for Bcolz
 
 Building
 --------
-See ```.travis.yml``` install section to get bcolz sources to be able to run 
-the following command.
+To be able to build, the package bcolz with ```carray_ext.pxd``` is needed.
 
 ```
 git clone https://github.com/esc/bcolz.git
@@ -17,3 +16,7 @@ export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 
 python setup.py build_ext --inplace
 ```
+
+Testing
+-------
+```$ nosetests bquery```
