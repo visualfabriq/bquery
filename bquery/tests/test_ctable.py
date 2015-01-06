@@ -6,6 +6,7 @@ import tempfile
 import numpy as np
 import shutil
 import nose
+from numpy.testing import assert_array_equal
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
 import itertools as itt
@@ -226,6 +227,74 @@ class TestCtable():
         assert_list_equal(
             sorted([list(x) for x in result_bcolz]),
             sorted(ref))
+
+    def test_where_terms00(self):
+        """
+        test_where_terms00: get terms in one column bigger than a certain value
+        """
+
+        # expected result
+        ref_data = np.fromiter(((x > 10000) for x in range(20000)), dtype='bool')
+        ref_result = bquery.carray(ref_data)
+
+        # generate data to filter on
+        iterable = ((x,x) for x in range(20000))
+        data = np.fromiter(iterable, dtype='i8,i8')
+
+        # filter data
+        terms_filter = [('f0', '>', 10000)]
+        ct = bquery.ctable(data, rootdir=self.rootdir)
+        result = ct.where_terms(terms_filter)
+
+        # compare
+        assert_array_equal(result, ref_result)
+
+    # def test_where_terms01(self):
+    #     """"""
+    #     print('#', __name__, self.__class__, 'test_where_terms00 - list input')
+    #
+    #     # print(TestH5.fact_bcolz.cols)
+    #     terms_filter = [('m1', '<=', '50000')]
+    #     mask = TestH5.fact_df['m1'] <= 50000
+    #     df = TestH5.fact_df[mask]
+    #     df_reset_index = df.reset_index(drop=True)
+    #
+    #     i = 0
+    #     for row in TestH5.fact_bcolz.where_terms(terms_filter):
+    #         assert_equal(df_reset_index.m1[i], row.m1)
+    #         i += 1
+    #
+    # def test_where_terms02(self):
+    #     """"""
+    #     print('#', __name__, self.__class__, 'test_where_terms02 - not in')
+    #
+    #     exclude = [27315, 72600, 11000, 15545, 189990]
+    #     terms_filter = [('m1', 'not in', exclude)]
+    #
+    #     mask = np.logical_not(TestH5.fact_df['m1'].isin(exclude))
+    #     df = TestH5.fact_df[mask]
+    #     df_reset_index = df.reset_index(drop=True)
+    #
+    #     i = 0
+    #     for row in TestH5.fact_bcolz.where_terms(terms_filter):
+    #         assert_equal(df_reset_index.m1[i], row.m1)
+    #         i += 1
+    #
+    # def test_where_terms03(self):
+    #     """"""
+    #     print('#', __name__, self.__class__, 'test_where_terms03 - in')
+    #
+    #     include = [27315, 72600, 11000, 15545, 189990]
+    #     terms_filter = [('m1', 'in', include)]
+    #
+    #     mask = TestH5.fact_df['m1'].isin(include)
+    #     df = TestH5.fact_df[mask]
+    #     df_reset_index = df.reset_index(drop=True)
+    #
+    #     i = 0
+    #     for row in TestH5.fact_bcolz.where_terms(terms_filter):
+    #         assert_equal(df_reset_index.m1[i], row.m1)
+    #         i += 1
 
 if __name__ == '__main__':
     nose.main()
