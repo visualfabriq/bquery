@@ -175,3 +175,8 @@ class TestCtable():
 
         assert_list_equal(
             [list(x) for x in result_bcolz], ref)
+
+    # TODO
+    # test_groupby_04: Test groupby's aggregation
+    #                      (groupby over multiple rows results
+    #                      into multiple groups)
