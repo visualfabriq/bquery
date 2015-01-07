@@ -317,5 +317,27 @@ class TestCtable():
 
         assert_array_equal(result, mask)
 
+    def test_where_terms04(self):
+        """
+        test_where_terms04: get mask where terms in list with only one item
+        """
+
+        include = [0]
+
+        # expected result
+        mask = np.zeros(20000,dtype=bool)
+        mask[include] = True
+
+        # generate data to filter on
+        iterable = ((x,x) for x in range(20000))
+        data = np.fromiter(iterable, dtype='i8,i8')
+
+        # filter data
+        terms_filter = [('f0', 'in', include)]
+        ct = bquery.ctable(data, rootdir=self.rootdir)
+        result = ct.where_terms(terms_filter)
+
+        assert_array_equal(result, mask)
+
 if __name__ == '__main__':
     nose.main()
