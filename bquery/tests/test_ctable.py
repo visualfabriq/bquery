@@ -234,11 +234,12 @@ class TestCtable():
         """
 
         # expected result
-        ref_data = np.fromiter(((x > 10000) for x in range(20000)), dtype='bool')
+        ref_data = np.fromiter(((x > 10000) for x in range(20000)),
+                               dtype='bool')
         ref_result = bquery.carray(ref_data)
 
         # generate data to filter on
-        iterable = ((x,x) for x in range(20000))
+        iterable = ((x, x) for x in range(20000))
         data = np.fromiter(iterable, dtype='i8,i8')
 
         # filter data
@@ -256,11 +257,12 @@ class TestCtable():
         """
 
         # expected result
-        ref_data = np.fromiter(((x <= 10000) for x in range(20000)), dtype='bool')
+        ref_data = np.fromiter(((x <= 10000) for x in range(20000)),
+                               dtype='bool')
         ref_result = bquery.carray(ref_data)
 
         # generate data to filter on
-        iterable = ((x,x) for x in range(20000))
+        iterable = ((x, x) for x in range(20000))
         data = np.fromiter(iterable, dtype='i8,i8')
 
         # filter data
@@ -280,11 +282,11 @@ class TestCtable():
         exclude = [0, 1, 2, 3, 11, 12, 13]
 
         # expected result
-        mask = np.ones(20000,dtype=bool)
+        mask = np.ones(20000, dtype=bool)
         mask[exclude] = False
 
         # generate data to filter on
-        iterable = ((x,x) for x in range(20000))
+        iterable = ((x, x) for x in range(20000))
         data = np.fromiter(iterable, dtype='i8,i8')
 
         # filter data
@@ -303,11 +305,11 @@ class TestCtable():
         include = [0, 1, 2, 3, 11, 12, 13]
 
         # expected result
-        mask = np.zeros(20000,dtype=bool)
+        mask = np.zeros(20000, dtype=bool)
         mask[include] = True
 
         # generate data to filter on
-        iterable = ((x,x) for x in range(20000))
+        iterable = ((x, x) for x in range(20000))
         data = np.fromiter(iterable, dtype='i8,i8')
 
         # filter data
@@ -325,11 +327,11 @@ class TestCtable():
         include = [0]
 
         # expected result
-        mask = np.zeros(20000,dtype=bool)
+        mask = np.zeros(20000, dtype=bool)
         mask[include] = True
 
         # generate data to filter on
-        iterable = ((x,x) for x in range(20000))
+        iterable = ((x, x) for x in range(20000))
         data = np.fromiter(iterable, dtype='i8,i8')
 
         # filter data
