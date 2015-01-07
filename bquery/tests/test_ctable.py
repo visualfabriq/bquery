@@ -271,22 +271,30 @@ class TestCtable():
         # compare
         assert_array_equal(result, ref_result)
 
-    #
-    # def test_where_terms02(self):
-    #     """"""
-    #     print('#', __name__, self.__class__, 'test_where_terms02 - not in')
-    #
-    #     exclude = [27315, 72600, 11000, 15545, 189990]
-    #     terms_filter = [('m1', 'not in', exclude)]
-    #
-    #     mask = np.logical_not(TestH5.fact_df['m1'].isin(exclude))
-    #     df = TestH5.fact_df[mask]
-    #     df_reset_index = df.reset_index(drop=True)
-    #
-    #     i = 0
-    #     for row in TestH5.fact_bcolz.where_terms(terms_filter):
-    #         assert_equal(df_reset_index.m1[i], row.m1)
-    #         i += 1
+
+    def test_where_terms02(self):
+        """
+        test_where_terms02: get mask where terms not in list
+        """
+
+        exclude = [0, 1, 2, 3, 11, 12, 13]
+
+        # expected result
+        mask = np.ones(20000,dtype=bool)
+        mask[exclude] = False
+
+        # generate data to filter on
+        iterable = ((x,x) for x in range(20000))
+        data = np.fromiter(iterable, dtype='i8,i8')
+
+        # filter data
+        terms_filter = [('f0', 'not in', exclude)]
+        ct = bquery.ctable(data, rootdir=self.rootdir)
+        result = ct.where_terms(terms_filter)
+
+        assert_array_equal(result, mask)
+
+
     #
     # def test_where_terms03(self):
     #     """"""
