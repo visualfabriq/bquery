@@ -249,20 +249,28 @@ class TestCtable():
         # compare
         assert_array_equal(result, ref_result)
 
-    # def test_where_terms01(self):
-    #     """"""
-    #     print('#', __name__, self.__class__, 'test_where_terms00 - list input')
-    #
-    #     # print(TestH5.fact_bcolz.cols)
-    #     terms_filter = [('m1', '<=', '50000')]
-    #     mask = TestH5.fact_df['m1'] <= 50000
-    #     df = TestH5.fact_df[mask]
-    #     df_reset_index = df.reset_index(drop=True)
-    #
-    #     i = 0
-    #     for row in TestH5.fact_bcolz.where_terms(terms_filter):
-    #         assert_equal(df_reset_index.m1[i], row.m1)
-    #         i += 1
+    def test_where_terms01(self):
+        """
+        test_where_terms01: get terms in one column less or equal than a
+                            certain value
+        """
+
+        # expected result
+        ref_data = np.fromiter(((x <= 10000) for x in range(20000)), dtype='bool')
+        ref_result = bquery.carray(ref_data)
+
+        # generate data to filter on
+        iterable = ((x,x) for x in range(20000))
+        data = np.fromiter(iterable, dtype='i8,i8')
+
+        # filter data
+        terms_filter = [('f0', '<=', 10000)]
+        ct = bquery.ctable(data, rootdir=self.rootdir)
+        result = ct.where_terms(terms_filter)
+
+        # compare
+        assert_array_equal(result, ref_result)
+
     #
     # def test_where_terms02(self):
     #     """"""
