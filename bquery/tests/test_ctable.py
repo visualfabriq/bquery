@@ -319,7 +319,7 @@ class TestCtable():
 
         assert_array_equal(result, mask)
 
-    def test_where_terms04(self):
+    def test_where_terms_04(self):
         """
         test_where_terms04: get mask where terms in list with only one item
         """
