@@ -62,7 +62,7 @@ class ctable(bcolz.ctable):
             # Check name validity
             nt = namedtuple('_nt', outcols, verbose=False)
             outcols = list(nt._fields)
-            if set(outcols) - set(self.names+['nrow__']) != set():
+            if set(outcols) - set(self.names + ['nrow__']) != set():
                 raise ValueError("not all outcols are real column names")
 
         # Get iterators for selected columns
@@ -83,8 +83,10 @@ class ctable(bcolz.ctable):
         Existing todos here are: these should be hidden helper carrays
         As in: not normal columns that you would normally see as a user
 
-        The factor (label index) carray is as long as the original carray (and the rest of the table therefore)
-        But the (unique) values carray is not as long (as long as the nr of unique values)
+        The factor (label index) carray is as long as the original carray
+        (and the rest of the table therefore)
+        But the (unique) values carray is not as long (as long as the number
+        of unique values)
 
         :param col_list:
         :param refresh:
@@ -92,7 +94,8 @@ class ctable(bcolz.ctable):
         """
 
         if not self.rootdir:
-            raise TypeError('Only out-of-core ctables can have factorization caching at the moment')
+            raise TypeError('Only out-of-core ctables can have '
+                            'factorization caching at the moment')
 
         for col in col_list:
 
@@ -102,12 +105,15 @@ class ctable(bcolz.ctable):
 
             # create cache if needed
             if refresh or not os.path.exists(col_factor_rootdir):
-                carray_factor = bcolz.carray([], dtype='int64', expectedlen=self.size,
-                                                    rootdir=col_factor_rootdir, mode='w')
-                _, values = ctable_ext.factorize(self[col], labels=carray_factor)
+                carray_factor = \
+                    bcolz.carray([], dtype='int64', expectedlen=self.size,
+                                   rootdir=col_factor_rootdir, mode='w')
+                _, values = \
+                    ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
-                carray_values = bcolz.carray(values.values(), dtype=self[col].dtype,
-                                                  rootdir=col_values_rootdir, mode='w')
+                carray_values = \
+                    bcolz.carray(values.values(), dtype=self[col].dtype,
+                                 rootdir=col_values_rootdir, mode='w')
                 carray_values.flush()
 
     def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None):
@@ -116,8 +122,10 @@ class ctable(bcolz.ctable):
 
         groupby_cols: a list of columns to groupby over
         agg_list: the aggregation operations, which can be:
-         - a straight forward sum of a list columns with a similarly named output: ['m1', 'm2', ...]
-         - a list of new column input/output settings [['mnew1', 'm1'], ['mnew2', 'm2], ...]
+         - a straight forward sum of a list columns with a
+           similarly named output: ['m1', 'm2', ...]
+         - a list of new column input/output settings
+           [['mnew1', 'm1'], ['mnew2', 'm2], ...]
          - a list that includes the type of aggregation for each column, i.e.
            [['mnew1', 'm1', 'sum'], ['mnew2', 'm1, 'avg'], ...]
 
@@ -132,24 +140,22 @@ class ctable(bcolz.ctable):
         """
 
         if not agg_list:
-            raise AttributeError('One or more aggregation operations need to be defined')
+            raise AttributeError('One or more aggregation operations '
+                                 'need to be defined')
 
         factor_list, values_list = self.factorize_groupby_cols(groupby_cols)
 
         factor_carray, nr_groups, skip_key = \
-            self.make_group_index(factor_list, values_list, groupby_cols, len(self), bool_arr)
+            self.make_group_index(factor_list, values_list, groupby_cols,
+                                  len(self), bool_arr)
 
-        ct_agg, dtype_list, agg_ops = self.create_agg_ctable(groupby_cols, agg_list, nr_groups, rootdir)
+        ct_agg, dtype_list, agg_ops = \
+            self.create_agg_ctable(groupby_cols, agg_list, nr_groups, rootdir)
 
         # perform aggregation
-        ctable_ext.aggregate_groups_by_iter_2(self,
-                                ct_agg,
-                                nr_groups,
-                                skip_key,
-                                factor_carray,
-                                groupby_cols,
-                                agg_ops,
-                                dtype_list)
+        ctable_ext.aggregate_groups_by_iter_2(self, ct_agg, nr_groups, skip_key,
+                                              factor_carray, groupby_cols,
+                                              agg_ops, dtype_list)
 
         return ct_agg
 
@@ -160,7 +166,8 @@ class ctable(bcolz.ctable):
 
         :type self: ctable
         """
-        # first check if the factorized arrays already exist unless we need to refresh the cache
+        # first check if the factorized arrays already exist
+        # unless we need to refresh the cache
         factor_list = []
         values_list = []
 
@@ -174,12 +181,15 @@ class ctable(bcolz.ctable):
                 col_values_rootdir = col_rootdir + '.values'
                 if os.path.exists(col_factor_rootdir):
                     cached = True
-                    col_factor_carray = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
-                    col_values_carray = bcolz.carray(rootdir=col_values_rootdir, mode='r')
+                    col_factor_carray = \
+                        bcolz.carray(rootdir=col_factor_rootdir, mode='r')
+                    col_values_carray = \
+                        bcolz.carray(rootdir=col_values_rootdir, mode='r')
 
             if not cached:
                 col_factor_carray, values = ctable_ext.factorize(self[col])
-                col_values_carray = bcolz.carray(values.values(), dtype=self[col].dtype)
+                col_values_carray = \
+                    bcolz.carray(values.values(), dtype=self[col].dtype)
 
             factor_list.append(col_factor_carray)
             values_list.append(col_values_carray)
@@ -187,16 +197,19 @@ class ctable(bcolz.ctable):
         return factor_list, values_list
 
 
-    def make_group_index(self, factor_list, values_list, groupby_cols, array_length, bool_arr):
+    def make_group_index(self, factor_list, values_list, groupby_cols,
+                         array_length, bool_arr):
         # create unique groups for groupby loop
 
         if len(factor_list) == 0:
-            # no columns to groupby over, so directly aggregate the measure columns to 1 total (index 0/zero)
+            # no columns to groupby over, so directly aggregate the measure
+            # columns to 1 total (index 0/zero)
             factor_carray = bcolz.zeros(array_length, dtype='int64')
             values = ['Total']
 
         elif len(factor_list) == 1:
-            # single column groupby, the groupby output column here is 1:1 to the values
+            # single column groupby, the groupby output column
+            # here is 1:1 to the values
             factor_carray = factor_list[0]
             values = values_list[0]
 
@@ -207,10 +220,12 @@ class ctable(bcolz.ctable):
             # first combine the factorized columns to single values
             factor_set = {x: y for x, y in zip(groupby_cols, factor_list)}
 
-            # create a numexpr expression that calculates the place on a cartesian join index
+            # create a numexpr expression that calculates the place on
+            # a cartesian join index
             eval_str = ''
             previous_value = 1
-            for col, values in zip(reversed(groupby_cols), reversed(values_list)):
+            for col, values \
+                    in zip(reversed(groupby_cols), reversed(values_list)):
                 if eval_str:
                     eval_str += ' + '
                 eval_str += str(previous_value) + '*' + col
@@ -226,11 +241,15 @@ class ctable(bcolz.ctable):
 
         if bool_arr is not None:
             # make all non relevant combinations -1
-            factor_carray = bcolz.eval('(factor + 1) * bool - 1', user_dict={'factor': factor_carray, 'bool': bool_arr})
+            factor_carray = bcolz.eval(
+                '(factor + 1) * bool - 1',
+                user_dict={'factor': factor_carray, 'bool': bool_arr})
             # now check how many unique values there are left
             factor_carray, values = ctable_ext.factorize(factor_carray)
-            # values might contain one value too much (-1) (no direct lookup possible because values is a reversed dict)
-            filter_check = [key for key, value in values.iteritems() if value == -1]
+            # values might contain one value too much (-1) (no direct lookup
+            # possible because values is a reversed dict)
+            filter_check = \
+                [key for key, value in values.iteritems() if value == -1]
             if filter_check:
                 skip_key = filter_check[0]
 
@@ -256,7 +275,7 @@ class ctable(bcolz.ctable):
         op_translation = {
             'sum': 1,
             'sum_na': 2
-            }
+        }
 
         for agg_info in agg_list:
 
@@ -275,7 +294,8 @@ class ctable(bcolz.ctable):
                     # input/output settings [['mnew1', 'm1', 'sum'], ['mnew2', 'm1, 'avg'], ...]
                     agg_op = agg_info[2]
                     if agg_op not in op_translation:
-                        raise NotImplementedError('Unknown Aggregation Type: ' + unicode(agg_op))
+                        raise NotImplementedError(
+                            'Unknown Aggregation Type: ' + unicode(agg_op))
                     agg_op = op_translation[agg_op]
 
             col_dtype = self[input_col].dtype
