@@ -295,22 +295,27 @@ class TestCtable():
         assert_array_equal(result, mask)
 
 
-    #
-    # def test_where_terms03(self):
-    #     """"""
-    #     print('#', __name__, self.__class__, 'test_where_terms03 - in')
-    #
-    #     include = [27315, 72600, 11000, 15545, 189990]
-    #     terms_filter = [('m1', 'in', include)]
-    #
-    #     mask = TestH5.fact_df['m1'].isin(include)
-    #     df = TestH5.fact_df[mask]
-    #     df_reset_index = df.reset_index(drop=True)
-    #
-    #     i = 0
-    #     for row in TestH5.fact_bcolz.where_terms(terms_filter):
-    #         assert_equal(df_reset_index.m1[i], row.m1)
-    #         i += 1
+    def test_where_terms03(self):
+        """
+        test_where_terms03: get mask where terms in list
+        """
+
+        include = [0, 1, 2, 3, 11, 12, 13]
+
+        # expected result
+        mask = np.zeros(20000,dtype=bool)
+        mask[include] = True
+
+        # generate data to filter on
+        iterable = ((x,x) for x in range(20000))
+        data = np.fromiter(iterable, dtype='i8,i8')
+
+        # filter data
+        terms_filter = [('f0', 'in', include)]
+        ct = bquery.ctable(data, rootdir=self.rootdir)
+        result = ct.where_terms(terms_filter)
+
+        assert_array_equal(result, mask)
 
 if __name__ == '__main__':
     nose.main()
