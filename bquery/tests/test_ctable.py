@@ -341,5 +341,29 @@ class TestCtable():
 
         assert_array_equal(result, mask)
 
+    def test_factorize_groupby_cols_01(self):
+        """
+        test_factorize_groupby_cols_01:
+        """
+        ref_fact_table = np.arange(20000) % 5
+        ref_fact_groups = np.arange(5)
+
+        # generate data
+        iterable = ((x, x % 5) for x in range(20000))
+        data = np.fromiter(iterable, dtype='i8,i8')
+        ct = bquery.ctable(data, rootdir=self.rootdir)
+
+        # factorize - check the only factirized col. [0]
+        fact_1 = ct.factorize_groupby_cols(['f1'])
+        # cache should be used this time
+        fact_2 = ct.factorize_groupby_cols(['f1'])
+
+        assert_array_equal(ref_fact_table, fact_1[0][0])
+        assert_array_equal(ref_fact_groups, fact_1[1][0])
+
+        assert_array_equal(fact_1[0][0], fact_2[0][0])
+        assert_array_equal(fact_1[1][0], fact_2[1][0])
+
+
 if __name__ == '__main__':
     nose.main()
