@@ -38,10 +38,9 @@ with ctime(message='cytoolz'):
     # In Memory Split-Apply-Combine
     # http://toolz.readthedocs.org/en/latest/streaming-analytics.html?highlight=reduce#split-apply-combine-with-groupby-and-reduceby
     r = cytoolz.groupby(lambda row: row.f0, ct)
-    print(valmap(compose(sum, pluck(2)), r))
-
+    print('cytoolz', valmap(compose(sum, pluck(2)), r))
 
 with ctime(message='bcolz'):
     ct.cache_factor(['f0'], refresh=True)
-    print(ct.groupby(['f0'], ['f2']))
+    print('bcolz', ct.groupby(['f0'], ['f2']))
 
