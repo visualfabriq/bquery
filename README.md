@@ -26,4 +26,4 @@ python setup.py install
 
 Testing
 -------
-```$ nosetests bquery```
+```nosetests bquery```
