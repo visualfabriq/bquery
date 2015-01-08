@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 from vbench.api import BenchmarkRunner
 from vbench.reports import generate_rst_files
 from suite import *
