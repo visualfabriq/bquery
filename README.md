@@ -25,3 +25,13 @@ python setup.py install
 Testing
 -------
 ```nosetests bquery```
+
+Benchmarks
+----------
+Short benchmark to compare bquery, cytoolz & pandas
+```python bquery/benchmarks/bench_groupby.py```
+
+Performance (vbench)
+--------------------
+Run vbench suite
+```python bquery/benchmarks/vb_suite/run_suite.py```
