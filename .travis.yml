@@ -6,10 +6,12 @@ python:
 # TODO: should python 3.4 be supported?
 #- 3.4
 install:
-- pip install nose
-- pip install numpy
 - pip install --install-option='--no-cython-compile' cython
+- pip install numpy
 - git clone https://github.com/esc/bcolz.git
+- cd bcolz
+- python setup.py build_ext --inplace
+- cd ..
 - export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 - python setup.py build_ext --inplace
 script:

@@ -9,6 +9,9 @@ To be able to build, the package bcolz with ```carray_ext.pxd``` at least versio
 
 ```
 git clone https://github.com/esc/bcolz.git
+cd bcolz
+python setup.py build_ext --inplace
+cd ..
 export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 ```
 
