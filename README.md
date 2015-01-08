@@ -18,6 +18,12 @@ export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 python setup.py build_ext --inplace
 ```
 
+Installing
+----------
+```
+python setup.py install
+```
+
 Testing
 -------
 ```$ nosetests bquery```
