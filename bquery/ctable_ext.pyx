@@ -64,7 +64,7 @@ def factorize_str(carray carray_, carray labels=None):
     n = len(carray_)
     chunklen = carray_.chunklen
     if labels is None:
-        labels = carray([], dtype='uint64', expectedlen=n)
+        labels = carray([], dtype='int64', expectedlen=n)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
     in_buffer = np.empty(chunklen, dtype=carray_.dtype)
@@ -237,7 +237,7 @@ def factorize_int32(carray carray_, carray labels=None):
     n = len(carray_)
     chunklen = carray_.chunklen
     if labels is None:
-        labels = carray([], dtype='int32', expectedlen=n)
+        labels = carray([], dtype='int64', expectedlen=n)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
     in_buffer = np.empty(chunklen, dtype='int32')
@@ -325,7 +325,7 @@ def factorize_float64(carray carray_, carray labels=None):
     n = len(carray_)
     chunklen = carray_.chunklen
     if labels is None:
-        labels = carray([], dtype='float64', expectedlen=n)
+        labels = carray([], dtype='int64', expectedlen=n)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
     in_buffer = np.empty(chunklen, dtype='float64')
