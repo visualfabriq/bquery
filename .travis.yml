@@ -8,7 +8,7 @@ python:
 install:
 - pip install --install-option='--no-cython-compile' cython
 - pip install numpy
-- git clone https://github.com/esc/bcolz.git
+- git clone https://github.com/blosc/bcolz.git
 - cd bcolz
 - python setup.py build_ext --inplace
 - cd ..
