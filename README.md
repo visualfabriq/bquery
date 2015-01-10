@@ -5,10 +5,10 @@ A query and aggregation framework for Bcolz
 
 Building
 --------
-To be able to build, the package bcolz with ```carray_ext.pxd``` at least version 0.7.4-dev is needed.
+To be able to build, the package bcolz with ```carray_ext.pxd``` at least version 0.8.0 is needed.
 
 ```
-git clone https://github.com/esc/bcolz.git
+git clone https://github.com/blosc/bcolz.git
 cd bcolz
 python setup.py build_ext --inplace
 cd ..
