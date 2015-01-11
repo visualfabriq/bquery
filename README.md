@@ -14,7 +14,45 @@ Other planned improvements are further improving per-column parallel execution o
 
 Though nascent, the technology itself is reliable and stable, if still limited in the depth of functionality. Visualfabriq uses bcolz and bquery to reliably handle billions of records for our clients with real-time reporting and machine learning usage. 
 
-Bquery requires bcolz. The use is also greatly encouraged to install numexpr.
+Bquery requires bcolz. The user is also greatly encouraged to install numexpr.
+
+Usage
+--------
+
+Bquery subclasses the ctable from bcolz, meaning that all original ctable functions are available while adding specific new ones. First start by having a ctable (if you do not have anything available, see the '''bench_groupby.py''' file for an example.
+
+    import bquery
+    # assuming you have an example on-table bcolz file called example.bcolz
+    ct = bquery.ctable(rootdir='example.bcolz')
+
+A groupby with aggregation is easy to perform: 
+
+ctable.groupby(list of groupby columns, agg_list)
+
+The agg_list contains the aggregations operations, which can be:
+- a straight forward sum of a list of columns with a similarly named output: ['m1', 'm2', ...]
+- a list of new columns with input/output names [['mnew1', 'm1'], ['mnew2', 'm2], ...]
+- a list that includes the type of aggregation for each column, i.e. [['mnew1', 'm1', 'sum'], ['mnew2', 'm1, 'avg'], ...]
+
+Examples:
+
+    # groupby column f0, perform a sum on column f2 and keep the output column with the same name
+    ct.groupby(['f0'], ['f2'])
+    
+    # groupby column f0, perform a sum on column f2 and rename the output column to f2_sum
+    ct.groupby(['f0'], [['f2', 'f2_sum']])
+
+    # groupby column f0, with a sum on f2 ('f2_sum') and a sum_na on f2 ('f2_sum_na')
+    ct.groupby(['f0'], [['f2', 'f2_sum', 'sum'], ['f2', 'f2_sum_na', 'sum_na']])
+
+If recurrent aggregations are done (typical in a reporting environment), you can speed up aggregations by preparing factorizations of groupby columns:
+
+ctable.cache_factor(list of all possible groupby columns)
+
+    # prepare 
+    ct.cache_factor(['f0'])
+
+If the table is changed, the factorization has to be re-performed. This is not triggered automatically yet.
 
 Building
 --------
