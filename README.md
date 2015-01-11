@@ -16,6 +16,8 @@ Though nascent, the technology itself is reliable and stable, if still limited i
 
 Bquery requires bcolz. The user is also greatly encouraged to install numexpr.
 
+Any help in extending, improving and speeding up bquery is very welcome.
+
 Usage
 --------
 
@@ -41,7 +43,7 @@ Examples:
     
     # groupby column f0, perform a sum on column f2 and rename the output column to f2_sum
     ct.groupby(['f0'], [['f2', 'f2_sum']])
-
+    
     # groupby column f0, with a sum on f2 ('f2_sum') and a sum_na on f2 ('f2_sum_na')
     ct.groupby(['f0'], [['f2', 'f2_sum', 'sum'], ['f2', 'f2_sum_na', 'sum_na']])
 
@@ -49,7 +51,7 @@ If recurrent aggregations are done (typical in a reporting environment), you can
 
 ctable.cache_factor(list of all possible groupby columns)
 
-    # prepare 
+    # cache factorization of column f0 to speed up future groupbys over column f0
     ct.cache_factor(['f0'])
 
 If the table is changed, the factorization has to be re-performed. This is not triggered automatically yet.
