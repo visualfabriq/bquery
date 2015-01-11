@@ -1,3 +1,4 @@
+from nose.plugins.attrib import attr
 import bquery
 import os
 import random
@@ -227,6 +228,66 @@ class TestCtable():
         assert_list_equal(
             sorted([list(x) for x in result_bcolz]),
             sorted(ref))
+
+    def _assert_list_equal(self, a, b):
+        assert_list_equal(a, b)
+
+    def test_groupby_05(self):
+        """
+        test_groupby_05: Test groupby's group creation without cache
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = ['f1']
+        num_rows = 200
+
+        for _dtype in \
+                [
+                    'i8',
+                    'i4',
+                    'f8',
+                    'S1',
+                ]:
+
+            # -- Data --
+            if _dtype == 'S1':
+                iterable = ((str(x % 5), x % 5) for x in range(num_rows))
+            else:
+                iterable = ((x % 5, x % 5) for x in range(num_rows))
+
+            data = np.fromiter(iterable, dtype=_dtype + ',i8')
+
+            # -- Bcolz --
+            print('--> Bcolz')
+            self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+            os.rmdir(self.rootdir)  # folder should be emtpy
+            fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+            fact_bcolz.flush()
+
+            result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
+            print result_bcolz
+
+            # Itertools result
+            print('--> Itertools')
+            result_itt = self.helper_itt_groupby(data, groupby_lambda)
+            uniquekeys = result_itt['uniquekeys']
+            print uniquekeys
+
+            ref = []
+            for item in result_itt['groups']:
+                f1 = 0
+                for row in item:
+                    f0 = row[0]
+                    f1 += row[1]
+                ref.append([f0]+[f1])
+
+            assert_list_equal(
+                sorted([list(x) for x in result_bcolz]),
+                sorted(ref))
+
+            yield self._assert_list_equal, list(result_bcolz['f0']), uniquekeys
 
     def test_where_terms00(self):
         """
