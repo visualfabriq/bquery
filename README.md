@@ -134,6 +134,8 @@ x1.57 slower than pandas
 ```
 For details about these results see please the python script
 
+You could also have a look at http://nbviewer.ipython.org/github/visualfabriq/bquery/blob/ipynb_bench/bquery/benchmarks/bench_groupby.ipynb
+
 Performance (vbench)
 --------------------
 Run vbench suite  
