@@ -8,6 +8,13 @@ from libc.string cimport strcpy
 from khash cimport *
 from bcolz.carray_ext cimport carray, chunk
 
+cdef enum:
+    SUM_DEF = 0
+    SUM_COUNT = 1
+    SUM_COUNT_NA = 2
+    SUM_SORTED_COUNT_DISTINCT = 3
+
+
 # Factorize Section
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -405,7 +412,8 @@ def agg_sum(iter_):
 # Aggregation Section
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef sum_float64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
+cdef sum_float64(carray ca_input, carray ca_factor,
+                 Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM_DEF):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -494,7 +502,8 @@ cdef sum_float64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssi
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef sum_int32(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
+cdef sum_int32(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM_DEF):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -583,7 +592,8 @@ cdef sum_int32(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef sum_int64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
+cdef sum_int64(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM_DEF):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
