@@ -420,7 +420,7 @@ cdef inline sum_float64_helper(ndarray[npy_float64] out_buffer,
     if sum_type == SUM_DEF:
         out_buffer[current_index] += in_buffer[i]
     elif sum_type == SUM_COUNT:
-        raise NotImplementedError('SUM_COUNT')
+        out_buffer[current_index] += 1
     elif sum_type == SUM_COUNT_NA:
         raise NotImplementedError('SUM_COUNT_NA')
     elif sum_type == SUM_SORTED_COUNT_DISTINCT:
@@ -436,7 +436,7 @@ cdef inline sum_int64_helper(ndarray[npy_int64] out_buffer,
     if sum_type == SUM_DEF:
         out_buffer[current_index] += in_buffer[i]
     elif sum_type == SUM_COUNT:
-        raise NotImplementedError('SUM_COUNT')
+        out_buffer[current_index] += 1
     elif sum_type == SUM_COUNT_NA:
         raise NotImplementedError('SUM_COUNT_NA')
     elif sum_type == SUM_SORTED_COUNT_DISTINCT:
@@ -452,7 +452,7 @@ cdef inline sum_int32_helper(ndarray[npy_int32] out_buffer,
     if sum_type == SUM_DEF:
         out_buffer[current_index] += in_buffer[i]
     elif sum_type == SUM_COUNT:
-        raise NotImplementedError('SUM_COUNT')
+        out_buffer[current_index] += 1
     elif sum_type == SUM_COUNT_NA:
         raise NotImplementedError('SUM_COUNT_NA')
     elif sum_type == SUM_SORTED_COUNT_DISTINCT:
