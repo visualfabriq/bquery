@@ -828,7 +828,8 @@ def aggregate_groups_by_iter_2(ct_input,
                         carray factor_carray,
                         groupby_cols,
                         output_agg_ops,
-                        dtype_list
+                        dtype_list,
+                        sum_type=SUM_DEF
                         ):
     total = []
 
@@ -839,11 +840,20 @@ def aggregate_groups_by_iter_2(ct_input,
         # TODO: input vs output column
         col_dtype = ct_agg[col].dtype
         if col_dtype == np.float64:
-            total.append(sum_float64(ct_input[col], factor_carray, nr_groups, skip_key))
+            total.append(
+                sum_float64(ct_input[col], factor_carray, nr_groups, skip_key,
+                            sum_type=sum_type)
+            )
         elif col_dtype == np.int64:
-            total.append(sum_int64(ct_input[col], factor_carray, nr_groups, skip_key))
+            total.append(
+                sum_int64(ct_input[col], factor_carray, nr_groups, skip_key,
+                          sum_type=sum_type)
+            )
         elif col_dtype == np.int32:
-            total.append(sum_int32(ct_input[col], factor_carray, nr_groups, skip_key))
+            total.append(
+                sum_int32(ct_input[col], factor_carray, nr_groups, skip_key,
+                          sum_type=sum_type)
+            )
         else:
             raise NotImplementedError(
                 'Column dtype ({0}) not supported for aggregation yet '
