@@ -417,12 +417,18 @@ cdef inline sum_float64_helper(ndarray[npy_float64] out_buffer,
                        ndarray[npy_float64] in_buffer,
                        Py_ssize_t i,
                        sum_type):
+    cdef:
+        npy_float64 v
+
     if sum_type == SUM_DEF:
         out_buffer[current_index] += in_buffer[i]
     elif sum_type == SUM_COUNT:
         out_buffer[current_index] += 1
     elif sum_type == SUM_COUNT_NA:
-        raise NotImplementedError('SUM_COUNT_NA')
+        v = in_buffer[i]
+        if v == v:  # skip NA values
+            print v
+            out_buffer[current_index] += 1
     elif sum_type == SUM_SORTED_COUNT_DISTINCT:
         raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
 
@@ -438,7 +444,8 @@ cdef inline sum_int64_helper(ndarray[npy_int64] out_buffer,
     elif sum_type == SUM_COUNT:
         out_buffer[current_index] += 1
     elif sum_type == SUM_COUNT_NA:
-        raise NotImplementedError('SUM_COUNT_NA')
+        # TODO: Warning: int does not support NA values, is this what we need?
+        out_buffer[current_index] += 1
     elif sum_type == SUM_SORTED_COUNT_DISTINCT:
         raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
 
@@ -454,7 +461,8 @@ cdef inline sum_int32_helper(ndarray[npy_int32] out_buffer,
     elif sum_type == SUM_COUNT:
         out_buffer[current_index] += 1
     elif sum_type == SUM_COUNT_NA:
-        raise NotImplementedError('SUM_COUNT_NA')
+        # TODO: Warning: int does not support NA values, is this what we need?
+        out_buffer[current_index] += 1
     elif sum_type == SUM_SORTED_COUNT_DISTINCT:
         raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
 

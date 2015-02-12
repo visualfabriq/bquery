@@ -45,6 +45,27 @@ class TestCtable():
             )
             yield d
 
+    def gen_dataset_count_with_NA(self, N):
+        pool = itertools.cycle(['a', 'a',
+                                'b', 'b', 'b',
+                                'c', 'c', 'c', 'c', 'c'])
+        pool_b = itertools.cycle([0.0, np.nan,
+                                  1.0,1.0,1.0,
+                                  3.0,3.0,3.0,3.0,3.0])
+        pool_c = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
+        pool_d = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
+        for _ in range(N):
+            d = (
+                pool.next(),
+                pool_b.next(),
+                pool_c.next(),
+                pool_d.next(),
+                random.random(),
+                random.randint(- 10, 10),
+                random.randint(- 10, 10),
+            )
+            yield d
+
     def gen_almost_unique_row(self, N):
         pool = itertools.cycle(['a', 'b', 'c', 'd', 'e'])
         pool_b = itertools.cycle([1.1, 1.2])
@@ -350,6 +371,57 @@ class TestCtable():
             for row in item:
                 f0 = groupby_lambda(row)
                 f4 += 1
+                f5 += 1
+                f6 += 1
+            ref.append([f0, f4, f5, f6])
+
+        assert_list_equal(
+            [list(x) for x in result_bcolz], ref)
+
+    def test_groupby_07(self):
+        """
+        test_groupby_07: Test groupby's aggregation type SUM_COUNT_NA
+                         (groupby a single row leads to a result with
+                         multiple groups)
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = ['f4', 'f5', 'f6']
+        num_rows = 2000
+
+        # -- Data --
+        g = self.gen_dataset_count_with_NA(num_rows)
+        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+
+        # -- Bcolz --
+        print('--> Bcolz')
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+        fact_bcolz.flush()
+
+        fact_bcolz.cache_factor(groupby_cols, refresh=True)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
+                                          sum_type=SUM_COUNT_NA)
+        print result_bcolz
+
+        # Itertools result
+        print('--> Itertools')
+        result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        uniquekeys = result_itt['uniquekeys']
+        print uniquekeys
+
+        ref = []
+        for item in result_itt['groups']:
+            f4 = 0
+            f5 = 0
+            f6 = 0
+            for row in item:
+                f0 = groupby_lambda(row)
+                if row[4] == row[4]:
+                    f4 += 1
                 f5 += 1
                 f6 += 1
             ref.append([f0, f4, f5, f6])
