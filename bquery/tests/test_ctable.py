@@ -49,18 +49,21 @@ class TestCtable():
         pool = itertools.cycle(['a', 'a',
                                 'b', 'b', 'b',
                                 'c', 'c', 'c', 'c', 'c'])
-        pool_b = itertools.cycle([0.0, np.nan,
+        pool_b = itertools.cycle([0.0, 0.1,
                                   1.0,1.0,1.0,
                                   3.0,3.0,3.0,3.0,3.0])
         pool_c = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
         pool_d = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
+        pool_e = itertools.cycle([np.nan, 0.0,
+                                  1.0,1.0,1.0,
+                                  3.0,3.0,3.0,3.0,3.0])
         for _ in range(N):
             d = (
                 pool.next(),
                 pool_b.next(),
                 pool_c.next(),
                 pool_d.next(),
-                random.random(),
+                pool_e.next(),
                 random.randint(- 10, 10),
                 random.randint(- 10, 10),
             )
@@ -389,7 +392,7 @@ class TestCtable():
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
         agg_list = ['f4', 'f5', 'f6']
-        num_rows = 2000
+        num_rows = 1000
 
         # -- Data --
         g = self.gen_dataset_count_with_NA(num_rows)
