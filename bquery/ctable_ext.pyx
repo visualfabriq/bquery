@@ -427,7 +427,6 @@ cdef inline sum_float64_helper(ndarray[npy_float64] out_buffer,
     elif sum_type == SUM_COUNT_NA:
         v = in_buffer[i]
         if v == v:  # skip NA values
-            print v
             out_buffer[current_index] += 1
     elif sum_type == SUM_SORTED_COUNT_DISTINCT:
         raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
