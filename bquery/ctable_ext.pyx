@@ -412,6 +412,54 @@ def agg_sum(iter_):
 # Aggregation Section
 @cython.wraparound(False)
 @cython.boundscheck(False)
+cdef inline sum_float64_helper(ndarray[npy_float64] out_buffer,
+                       Py_ssize_t current_index,
+                       ndarray[npy_float64] in_buffer,
+                       Py_ssize_t i,
+                       sum_type):
+    if sum_type == SUM_DEF:
+        out_buffer[current_index] += in_buffer[i]
+    elif sum_type == SUM_COUNT:
+        raise NotImplementedError('SUM_COUNT')
+    elif sum_type == SUM_COUNT_NA:
+        raise NotImplementedError('SUM_COUNT_NA')
+    elif sum_type == SUM_SORTED_COUNT_DISTINCT:
+        raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef inline sum_int64_helper(ndarray[npy_int64] out_buffer,
+                       Py_ssize_t current_index,
+                       ndarray[npy_int64] in_buffer,
+                       Py_ssize_t i,
+                       sum_type):
+    if sum_type == SUM_DEF:
+        out_buffer[current_index] += in_buffer[i]
+    elif sum_type == SUM_COUNT:
+        raise NotImplementedError('SUM_COUNT')
+    elif sum_type == SUM_COUNT_NA:
+        raise NotImplementedError('SUM_COUNT_NA')
+    elif sum_type == SUM_SORTED_COUNT_DISTINCT:
+        raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef inline sum_int32_helper(ndarray[npy_int32] out_buffer,
+                       Py_ssize_t current_index,
+                       ndarray[npy_int32] in_buffer,
+                       Py_ssize_t i,
+                       sum_type):
+    if sum_type == SUM_DEF:
+        out_buffer[current_index] += in_buffer[i]
+    elif sum_type == SUM_COUNT:
+        raise NotImplementedError('SUM_COUNT')
+    elif sum_type == SUM_COUNT_NA:
+        raise NotImplementedError('SUM_COUNT_NA')
+    elif sum_type == SUM_SORTED_COUNT_DISTINCT:
+        raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
 cdef sum_float64(carray ca_input, carray ca_factor,
                  Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM_DEF):
     cdef:
@@ -466,7 +514,8 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_float64_helper(out_buffer, current_index,
+                                   in_buffer, i, sum_type)
 
     leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
     if leftover_elements > 0:
@@ -492,7 +541,8 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_float64_helper(out_buffer, current_index,
+                                   in_buffer, i, sum_type)
 
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
@@ -556,7 +606,8 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_int32_helper(out_buffer, current_index,
+                                 in_buffer, i, sum_type)
 
     leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
     if leftover_elements > 0:
@@ -582,7 +633,8 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_int32_helper(out_buffer, current_index,
+                                 in_buffer, i, sum_type)
 
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
@@ -646,7 +698,8 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_int64_helper(out_buffer, current_index,
+                                 in_buffer, i, sum_type)
 
     leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
     if leftover_elements > 0:
@@ -672,7 +725,8 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_int64_helper(out_buffer, current_index,
+                                 in_buffer, i, sum_type)
 
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
