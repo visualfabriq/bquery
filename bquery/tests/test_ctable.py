@@ -432,6 +432,59 @@ class TestCtable():
         assert_list_equal(
             [list(x) for x in result_bcolz], ref)
 
+    @attr('dev')
+    def test_groupby_08(self):
+        """
+        test_groupby_08: Test groupby's aggregation type
+                         SUM_SORTED_COUNT_DISTINCT
+                         (groupby a single row leads to a result with
+                         multiple groups)
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = ['f4', 'f5', 'f6']
+        num_rows = 100
+
+        # -- Data --
+        g = self.gen_dataset_count_with_NA(num_rows)
+        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+
+        # -- Bcolz --
+        print('--> Bcolz')
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+        fact_bcolz.flush()
+
+        fact_bcolz.cache_factor(groupby_cols, refresh=True)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
+                                          sum_type=SUM_SORTED_COUNT_DISTINCT)
+        print result_bcolz
+        #
+        # # Itertools result
+        # print('--> Itertools')
+        # result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        # uniquekeys = result_itt['uniquekeys']
+        # print uniquekeys
+        #
+        # ref = []
+        # for item in result_itt['groups']:
+        #     f4 = 0
+        #     f5 = 0
+        #     f6 = 0
+        #     for row in item:
+        #         f0 = groupby_lambda(row)
+        #         if row[4] == row[4]:
+        #             f4 += 1
+        #         f5 += 1
+        #         f6 += 1
+        #     ref.append([f0, f4, f5, f6])
+        #
+        # assert_list_equal(
+        #     [list(x) for x in result_bcolz], ref)
+
     def _assert_list_equal(self, a, b):
         assert_list_equal(a, b)
 

@@ -465,6 +465,88 @@ cdef inline sum_int32_helper(ndarray[npy_int32] out_buffer,
     elif sum_type == SUM_SORTED_COUNT_DISTINCT:
         raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
 
+# -- pandas reference --
+# @cython.boundscheck(False)
+# @cython.wraparound(False)
+# def groupsort_indexer(ndarray[int64_t] index, Py_ssize_t ngroups):
+#     cdef:
+#         Py_ssize_t i, loc, label, n
+#         ndarray[int64_t] counts, where, result
+#
+#     # count group sizes, location 0 for NA
+#     counts = np.zeros(ngroups + 1, dtype=np.int64)
+#     n = len(index)
+#     for i from 0 <= i < n:
+#         counts[index[i] + 1] += 1
+#
+#     # mark the start of each contiguous group of like-indexed data
+#     where = np.zeros(ngroups + 1, dtype=np.int64)
+#     for i from 1 <= i < ngroups + 1:
+#         where[i] = where[i - 1] + counts[i - 1]
+#
+#     # this is our indexer
+#     result = np.zeros(n, dtype=np.int64)
+#     for i from 0 <= i < n:
+#         label = index[i] + 1
+#         result[where[label]] = i
+#         where[label] += 1
+#
+#     return result, counts
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def groupsort_indexer(carray index, Py_ssize_t ngroups):
+    cdef:
+        Py_ssize_t i, loc, label, n
+        ndarray[int64_t] counts, where, np_result
+        # --
+        carray c_result
+        chunk input_chunk, index_chunk
+        Py_ssize_t index_chunk_nr, index_chunk_len, index_chunk_row, \
+            leftover_elements
+
+    index_chunk_len = index.chunklen
+    in_buffer = np.empty(index_chunk_len, dtype='float64')
+    index_chunk_nr = 0
+
+    # count group sizes, location 0 for NA
+    counts = np.zeros(ngroups + 1, dtype=np.int64)
+    n = len(index)
+
+    for index_chunk_nr in range(index.nchunks):
+        # fill input buffer
+        input_chunk = index.chunks[index_chunk_nr]
+        input_chunk._getitem(0, index_chunk_len, in_buffer.data)
+
+        # loop through rows
+        for i in range(index_chunk_len):
+            counts[index[i] + 1] += 1
+
+    leftover_elements = cython.cdiv(index.leftover, index.atomsize)
+    if leftover_elements > 0:
+        # fill input buffer
+        in_buffer = index.leftover_array
+
+        # loop through rows
+        for i in range(leftover_elements):
+            counts[index[i] + 1] += 1
+
+    # mark the start of each contiguous group of like-indexed data
+    where = np.zeros(ngroups + 1, dtype=np.int64)
+    for i from 1 <= i < ngroups + 1:
+        where[i] = where[i - 1] + counts[i - 1]
+
+    # this is our indexer
+    np_result = np.zeros(n, dtype=np.int64)
+    for i from 0 <= i < n:
+        label = index[i] + 1
+        np_result[where[label]] = i
+        where[label] += 1
+
+    c_result = carray(np_result, dtype='int64', expectedlen=n)
+
+    return c_result, counts
+
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_float64(carray ca_input, carray ca_factor,
@@ -482,6 +564,11 @@ cdef sum_float64(carray ca_input, carray ca_factor,
     count = 0
     ret = 0
     reverse = {}
+
+    if sum_type == SUM_SORTED_COUNT_DISTINCT:
+        c_result, counts = groupsort_indexer(ca_factor, nr_groups)
+        print c_result
+        print counts
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='float64')
@@ -575,6 +662,11 @@ cdef sum_int32(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
+    if sum_type == SUM_SORTED_COUNT_DISTINCT:
+        c_result, counts = groupsort_indexer(ca_factor, nr_groups)
+        print c_result
+        print counts
+
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='int32')
     factor_chunk_len = ca_factor.chunklen
@@ -666,6 +758,11 @@ cdef sum_int64(carray ca_input, carray ca_factor,
     count = 0
     ret = 0
     reverse = {}
+
+    if sum_type == SUM_SORTED_COUNT_DISTINCT:
+        c_result, counts = groupsort_indexer(ca_factor, nr_groups)
+        print c_result
+        print counts
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='int64')
