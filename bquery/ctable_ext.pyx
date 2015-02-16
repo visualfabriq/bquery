@@ -936,6 +936,15 @@ def aggregate_groups_by_iter_2(ct_input,
                         ):
     total = []
 
+    # print '--1\n',ct_input
+    # print '--2\n',ct_agg
+    # print '--3\n',nr_groups
+    # print '--4\n',skip_key
+    # print '--5\n',factor_carray
+    # print '--6\n',groupby_cols
+    # print '--7\n',output_agg_ops
+    # print '--8\n',dtype_list
+    # print '--9\n',sum_type
     for col in groupby_cols:
         total.append(groupby_value(ct_input[col], factor_carray, nr_groups, skip_key))
 
@@ -962,6 +971,7 @@ def aggregate_groups_by_iter_2(ct_input,
                 'Column dtype ({0}) not supported for aggregation yet '
                 '(only int32, int64 & float64)'.format(str(col_dtype)))
 
+    print '--10\n', total
     ct_agg.append(total)
 
 # ---------------------------------------------------------------------------
