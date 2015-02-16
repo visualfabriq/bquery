@@ -504,6 +504,7 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
         chunk input_chunk, index_chunk
         Py_ssize_t index_chunk_nr, index_chunk_len, leftover_elements
 
+    print 'index\n', index
     index_chunk_len = index.chunklen
     in_buffer = np.empty(index_chunk_len, dtype='float64')
     index_chunk_nr = 0
@@ -542,9 +543,52 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
         np_result[where[label]] = i
         where[label] += 1
 
-    c_result = carray(np_result, dtype='int64', expectedlen=n)
+    # c_result = carray(np_result, dtype='int64', expectedlen=n)
 
-    return c_result, counts
+    return np_result, counts
+
+cdef unique(kh_float64_t *table, carray values):
+    cdef:
+        Py_ssize_t i, n = len(values)
+        Py_ssize_t idx, count = 0
+        int ret = 0
+        float64_t val
+        npy_uint64 k
+        carray uniques = carray([], dtype='float64')
+        bint seen_na = 0
+
+    # for input_chunk_nr in range(ca_input.nchunks):
+    #     # fill input buffer
+    #     input_chunk = ca_input.chunks[input_chunk_nr]
+    #     input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+    #
+    #     # loop through rows
+    #     for i in range(input_chunk_len):
+    #         pass
+    #
+    # leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
+    # if leftover_elements > 0:
+    #     # fill input buffer
+    #     in_buffer = ca_input.leftover_array
+    #
+    #     # loop through rows
+    #     for i in range(leftover_elements):
+    #         pass
+
+    for i in range(n):
+        val = values[i]
+
+        if val == val:
+            k = kh_get_float64(table, val)
+            if k == table.n_buckets:
+                k = kh_put_float64(table, val, &ret)
+                uniques.append(val)
+                count += 1
+        elif not seen_na:
+            seen_na = 1
+            uniques.append(np.nan)
+
+    return uniques
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -554,7 +598,7 @@ cdef sum_float64(carray ca_input, carray ca_factor,
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, factor_total_chunks, leftover_elements
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
 
         ndarray[npy_float64] in_buffer
         ndarray[npy_int64] factor_buffer
@@ -565,9 +609,18 @@ cdef sum_float64(carray ca_input, carray ca_factor,
     reverse = {}
 
     if sum_type == SUM_SORTED_COUNT_DISTINCT:
-        c_result, counts = groupsort_indexer(ca_factor, nr_groups)
-        print c_result
-        print counts
+        positions, counts = groupsort_indexer(ca_factor, nr_groups)
+        start_counts = 0
+        end_counts = 0
+        for j in range(len(counts) - 1):
+            start_counts = end_counts
+            end_counts = start_counts + counts[j + 1]
+            positions[start_counts:end_counts]
+            unique(table, ca_input[positions[start_counts:end_counts]])
+
+        print 'postions Tot', positions
+        print 'counts', counts
+        return counts
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='float64')
@@ -663,8 +716,8 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 
     if sum_type == SUM_SORTED_COUNT_DISTINCT:
         c_result, counts = groupsort_indexer(ca_factor, nr_groups)
-        print c_result
-        print counts
+        print 'counts', counts
+        return counts
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='int32')
@@ -760,8 +813,8 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 
     if sum_type == SUM_SORTED_COUNT_DISTINCT:
         c_result, counts = groupsort_indexer(ca_factor, nr_groups)
-        print c_result
-        print counts
+        print 'counts', counts
+        return counts
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='int64')

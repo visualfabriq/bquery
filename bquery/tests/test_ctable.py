@@ -55,8 +55,8 @@ class TestCtable():
         pool_c = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
         pool_d = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
         pool_e = itertools.cycle([np.nan, 0.0,
-                                  1.0,1.0,1.0,
-                                  3.0,3.0,3.0,3.0,3.0])
+                                  np.nan,1.0,1.0,
+                                  np.nan,3.0,3.0,3.0,3.0])
         for _ in range(N):
             d = (
                 pool.next(),
@@ -444,12 +444,14 @@ class TestCtable():
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
-        agg_list = ['f4', 'f5', 'f6']
-        num_rows = 100
+        agg_list = ['f4']
+        num_rows = 20
 
         # -- Data --
         g = self.gen_dataset_count_with_NA(num_rows)
         data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+        print 'data'
+        print data
 
         # -- Bcolz --
         print('--> Bcolz')
