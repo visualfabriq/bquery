@@ -547,7 +547,7 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
 
     return np_result, counts
 
-cdef unique(kh_float64_t *table, carray values):
+cdef unique(ndarray[float64_t] values):
     cdef:
         Py_ssize_t i, n = len(values)
         Py_ssize_t idx, count = 0
@@ -556,24 +556,9 @@ cdef unique(kh_float64_t *table, carray values):
         npy_uint64 k
         carray uniques = carray([], dtype='float64')
         bint seen_na = 0
+        kh_float64_t *table
 
-    # for input_chunk_nr in range(ca_input.nchunks):
-    #     # fill input buffer
-    #     input_chunk = ca_input.chunks[input_chunk_nr]
-    #     input_chunk._getitem(0, input_chunk_len, in_buffer.data)
-    #
-    #     # loop through rows
-    #     for i in range(input_chunk_len):
-    #         pass
-    #
-    # leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
-    # if leftover_elements > 0:
-    #     # fill input buffer
-    #     in_buffer = ca_input.leftover_array
-    #
-    #     # loop through rows
-    #     for i in range(leftover_elements):
-    #         pass
+    table = kh_init_float64()
 
     for i in range(n):
         val = values[i]
@@ -587,6 +572,8 @@ cdef unique(kh_float64_t *table, carray values):
         elif not seen_na:
             seen_na = 1
             uniques.append(np.nan)
+
+    kh_destroy_float64(table)
 
     return uniques
 
@@ -616,7 +603,7 @@ cdef sum_float64(carray ca_input, carray ca_factor,
             start_counts = end_counts
             end_counts = start_counts + counts[j + 1]
             positions[start_counts:end_counts]
-            unique(table, ca_input[positions[start_counts:end_counts]])
+            print 'unique', unique(ca_input[positions[start_counts:end_counts]])
 
         print 'postions Tot', positions
         print 'counts', counts
