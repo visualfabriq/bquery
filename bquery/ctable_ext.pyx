@@ -591,11 +591,14 @@ cdef sum_float64(carray ca_input, carray ca_factor,
         ndarray[npy_int64] factor_buffer
         ndarray[npy_float64] out_buffer
 
+        carray num_uniques
+
     count = 0
     ret = 0
     reverse = {}
 
     if sum_type == SUM_SORTED_COUNT_DISTINCT:
+        num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
         end_counts = 0
@@ -603,11 +606,14 @@ cdef sum_float64(carray ca_input, carray ca_factor,
             start_counts = end_counts
             end_counts = start_counts + counts[j + 1]
             positions[start_counts:end_counts]
-            print 'unique', unique(ca_input[positions[start_counts:end_counts]])
+            num_uniques.append(
+                len(unique(ca_input[positions[start_counts:end_counts]]))
+            )
 
         print 'postions Tot', positions
         print 'counts', counts
-        return counts
+        print 'num_uniques', num_uniques
+        return num_uniques
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='float64')
