@@ -498,9 +498,9 @@ cdef inline sum_int32_helper(ndarray[npy_int32] out_buffer,
 def groupsort_indexer(carray index, Py_ssize_t ngroups):
     cdef:
         Py_ssize_t i, label, n
-        ndarray[int64_t] counts, where, np_result
+        ndarray[int64_t] np_counts, where, np_result
         # --
-        carray c_result
+        carray c_result, c_counts
         chunk input_chunk, index_chunk
         Py_ssize_t index_chunk_nr, index_chunk_len, leftover_elements
 
@@ -509,7 +509,7 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
     index_chunk_nr = 0
 
     # count group sizes, location 0 for NA
-    counts = np.zeros(ngroups + 1, dtype=np.int64)
+    np_counts = np.zeros(ngroups + 1, dtype=np.int64)
     n = len(index)
 
     for index_chunk_nr in range(index.nchunks):
@@ -519,7 +519,7 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
 
         # loop through rows
         for i in range(index_chunk_len):
-            counts[index[i] + 1] += 1
+            np_counts[index[i] + 1] += 1
 
     leftover_elements = cython.cdiv(index.leftover, index.atomsize)
     if leftover_elements > 0:
@@ -528,12 +528,12 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
 
         # loop through rows
         for i in range(leftover_elements):
-            counts[index[i] + 1] += 1
+            np_counts[index[i] + 1] += 1
 
     # mark the start of each contiguous group of like-indexed data
     where = np.zeros(ngroups + 1, dtype=np.int64)
     for i from 1 <= i < ngroups + 1:
-        where[i] = where[i - 1] + counts[i - 1]
+        where[i] = where[i - 1] + np_counts[i - 1]
 
     # this is our indexer
     np_result = np.zeros(n, dtype=np.int64)
@@ -543,8 +543,9 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
         where[label] += 1
 
     c_result = carray(np_result, dtype='int64', expectedlen=n)
+    c_counts = carray(np_counts, dtype='int64', expectedlen=ngroups + 1)
 
-    return c_result, counts
+    return c_result, c_counts
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
