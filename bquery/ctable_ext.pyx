@@ -504,7 +504,6 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
         chunk input_chunk, index_chunk
         Py_ssize_t index_chunk_nr, index_chunk_len, leftover_elements
 
-    print 'index\n', index
     index_chunk_len = index.chunklen
     in_buffer = np.empty(index_chunk_len, dtype='float64')
     index_chunk_nr = 0
@@ -610,9 +609,6 @@ cdef sum_float64(carray ca_input, carray ca_factor,
                 len(unique(ca_input[positions[start_counts:end_counts]]))
             )
 
-        print 'postions Tot', positions
-        print 'counts', counts
-        print 'num_uniques', num_uniques
         return num_uniques
 
     input_chunk_len = ca_input.chunklen
@@ -709,7 +705,6 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 
     if sum_type == SUM_SORTED_COUNT_DISTINCT:
         c_result, counts = groupsort_indexer(ca_factor, nr_groups)
-        print 'counts', counts
         return counts
 
     input_chunk_len = ca_input.chunklen
@@ -806,7 +801,6 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 
     if sum_type == SUM_SORTED_COUNT_DISTINCT:
         c_result, counts = groupsort_indexer(ca_factor, nr_groups)
-        print 'counts', counts
         return counts
 
     input_chunk_len = ca_input.chunklen
@@ -982,15 +976,6 @@ def aggregate_groups_by_iter_2(ct_input,
                         ):
     total = []
 
-    # print '--1\n',ct_input
-    # print '--2\n',ct_agg
-    # print '--3\n',nr_groups
-    # print '--4\n',skip_key
-    # print '--5\n',factor_carray
-    # print '--6\n',groupby_cols
-    # print '--7\n',output_agg_ops
-    # print '--8\n',dtype_list
-    # print '--9\n',sum_type
     for col in groupby_cols:
         total.append(groupby_value(ct_input[col], factor_carray, nr_groups, skip_key))
 
@@ -1017,7 +1002,6 @@ def aggregate_groups_by_iter_2(ct_input,
                 'Column dtype ({0}) not supported for aggregation yet '
                 '(only int32, int64 & float64)'.format(str(col_dtype)))
 
-    print '--10\n', total
     ct_agg.append(total)
 
 # ---------------------------------------------------------------------------
