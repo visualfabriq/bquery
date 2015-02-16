@@ -7,6 +7,7 @@ import tempfile
 import numpy as np
 import shutil
 import nose
+import numpy as np
 from numpy.testing import assert_array_equal
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
@@ -432,6 +433,23 @@ class TestCtable():
         assert_list_equal(
             [list(x) for x in result_bcolz], ref)
 
+    def _get_unique(self, values):
+        new_values = []
+        nan_found = False
+
+        for item in values:
+            if item not in new_values:
+                print item
+                if item == item:
+                    new_values.append(item)
+                else:
+                    if not nan_found:
+                        new_values.append(item)
+                        nan_found = True
+
+
+        return new_values
+
     @attr('dev')
     def test_groupby_08(self):
         """
@@ -466,26 +484,22 @@ class TestCtable():
         print result_bcolz
         #
         # # Itertools result
-        # print('--> Itertools')
-        # result_itt = self.helper_itt_groupby(data, groupby_lambda)
-        # uniquekeys = result_itt['uniquekeys']
-        # print uniquekeys
-        #
-        # ref = []
-        # for item in result_itt['groups']:
-        #     f4 = 0
-        #     f5 = 0
-        #     f6 = 0
-        #     for row in item:
-        #         f0 = groupby_lambda(row)
-        #         if row[4] == row[4]:
-        #             f4 += 1
-        #         f5 += 1
-        #         f6 += 1
-        #     ref.append([f0, f4, f5, f6])
-        #
-        # assert_list_equal(
-        #     [list(x) for x in result_bcolz], ref)
+        print('--> Itertools')
+        result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        uniquekeys = result_itt['uniquekeys']
+        print uniquekeys
+
+
+        ref = []
+
+        for u, item in zip(uniquekeys, result_itt['groups']):
+            f4 = len(self._get_unique([x[4] for x in result_itt['groups'][0]]))
+            # f5 = len(self._get_unique([x[5] for x in result_itt['groups'][0]]))
+            # f6 = len(self._get_unique([x[6] for x in result_itt['groups'][0]]))
+            ref.append([u, f4])
+
+        assert_list_equal(
+            [list(x) for x in result_bcolz], ref)
 
     def _assert_list_equal(self, a, b):
         assert_list_equal(a, b)
