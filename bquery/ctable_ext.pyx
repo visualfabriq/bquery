@@ -497,13 +497,12 @@ cdef inline sum_int32_helper(ndarray[npy_int32] out_buffer,
 @cython.wraparound(False)
 def groupsort_indexer(carray index, Py_ssize_t ngroups):
     cdef:
-        Py_ssize_t i, loc, label, n
+        Py_ssize_t i, label, n
         ndarray[int64_t] counts, where, np_result
         # --
         carray c_result
         chunk input_chunk, index_chunk
-        Py_ssize_t index_chunk_nr, index_chunk_len, index_chunk_row, \
-            leftover_elements
+        Py_ssize_t index_chunk_nr, index_chunk_len, leftover_elements
 
     index_chunk_len = index.chunklen
     in_buffer = np.empty(index_chunk_len, dtype='float64')
