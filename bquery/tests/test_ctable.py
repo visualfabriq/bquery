@@ -178,7 +178,7 @@ class TestCtable():
     def test_groupby_03(self):
         """
         test_groupby_03: Test groupby's aggregations
-                         (groupby single row rsults into multiple groups)
+                         (groupby single row results into multiple groups)
         """
         random.seed(1)
 
@@ -334,9 +334,7 @@ class TestCtable():
 
     def test_groupby_06(self):
         """
-        test_groupby_06: Test groupby's aggregation type SUM_COUNT
-                         (groupby a single row leads to a result with
-                         multiple groups)
+        test_groupby_06: Groupby type SUM_COUNT
         """
         random.seed(1)
 
@@ -384,9 +382,7 @@ class TestCtable():
 
     def test_groupby_07(self):
         """
-        test_groupby_07: Test groupby's aggregation type SUM_COUNT_NA
-                         (groupby a single row leads to a result with
-                         multiple groups)
+        test_groupby_07: Groupby type SUM_COUNT_NA
         """
         random.seed(1)
 
@@ -453,10 +449,7 @@ class TestCtable():
     @attr('dev')
     def test_groupby_08(self):
         """
-        test_groupby_08: Test groupby's aggregation type
-                         SUM_SORTED_COUNT_DISTINCT
-                         (groupby a single row leads to a result with
-                         multiple groups)
+        test_groupby_08: Groupby's type SUM_SORTED_COUNT_DISTINCT
         """
         random.seed(1)
 
