@@ -7,11 +7,12 @@ import tempfile
 import numpy as np
 import shutil
 import nose
+import numpy as np
 from numpy.testing import assert_array_equal
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
 import itertools as itt
-
+from bquery.ctable import SUM_DEF, SUM_COUNT, SUM_COUNT_NA, SUM_SORTED_COUNT_DISTINCT
 
 class TestCtable():
     def setup(self):
@@ -23,6 +24,51 @@ class TestCtable():
         if self.rootdir:
             shutil.rmtree(self.rootdir)
             self.rootdir = None
+
+    def gen_dataset_count(self, N):
+        pool = itertools.cycle(['a', 'a',
+                                'b', 'b', 'b',
+                                'c', 'c', 'c', 'c', 'c'])
+        pool_b = itertools.cycle([0.0, 0.0,
+                                  1.0,1.0,1.0,
+                                  3.0,3.0,3.0,3.0,3.0])
+        pool_c = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
+        pool_d = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
+        for _ in range(N):
+            d = (
+                pool.next(),
+                pool_b.next(),
+                pool_c.next(),
+                pool_d.next(),
+                random.random(),
+                random.randint(- 10, 10),
+                random.randint(- 10, 10),
+            )
+            yield d
+
+    def gen_dataset_count_with_NA(self, N):
+        pool = itertools.cycle(['a', 'a',
+                                'b', 'b', 'b',
+                                'c', 'c', 'c', 'c', 'c'])
+        pool_b = itertools.cycle([0.0, 0.1,
+                                  1.0,1.0,1.0,
+                                  3.0,3.0,3.0,3.0,3.0])
+        pool_c = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
+        pool_d = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
+        pool_e = itertools.cycle([np.nan, 0.0,
+                                  np.nan,1.0,1.0,
+                                  np.nan,3.0,3.0,3.0,3.0])
+        for _ in range(N):
+            d = (
+                pool.next(),
+                pool_b.next(),
+                pool_c.next(),
+                pool_d.next(),
+                pool_e.next(),
+                random.randint(- 10, 10),
+                random.randint(- 10, 10),
+            )
+            yield d
 
     def gen_almost_unique_row(self, N):
         pool = itertools.cycle(['a', 'b', 'c', 'd', 'e'])
@@ -132,7 +178,7 @@ class TestCtable():
     def test_groupby_03(self):
         """
         test_groupby_03: Test groupby's aggregations
-                         (groupby single row rsults into multiple groups)
+                         (groupby single row results into multiple groups)
         """
         random.seed(1)
 
@@ -229,9 +275,6 @@ class TestCtable():
             sorted([list(x) for x in result_bcolz]),
             sorted(ref))
 
-    def _assert_list_equal(self, a, b):
-        assert_list_equal(a, b)
-
     def test_groupby_05(self):
         """
         test_groupby_05: Test groupby's group creation without cache
@@ -288,6 +331,195 @@ class TestCtable():
                 sorted(ref))
 
             yield self._assert_list_equal, list(result_bcolz['f0']), uniquekeys
+
+    def test_groupby_06(self):
+        """
+        test_groupby_06: Groupby type SUM_COUNT
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = ['f4', 'f5', 'f6']
+        num_rows = 2000
+
+        # -- Data --
+        g = self.gen_dataset_count(num_rows)
+        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+
+        # -- Bcolz --
+        print('--> Bcolz')
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+        fact_bcolz.flush()
+
+        fact_bcolz.cache_factor(groupby_cols, refresh=True)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
+                                          sum_type=SUM_COUNT)
+        print result_bcolz
+
+        # Itertools result
+        print('--> Itertools')
+        result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        uniquekeys = result_itt['uniquekeys']
+        print uniquekeys
+
+        ref = []
+        for item in result_itt['groups']:
+            f4 = 0
+            f5 = 0
+            f6 = 0
+            for row in item:
+                f0 = groupby_lambda(row)
+                f4 += 1
+                f5 += 1
+                f6 += 1
+            ref.append([f0, f4, f5, f6])
+
+        assert_list_equal(
+            [list(x) for x in result_bcolz], ref)
+
+    def test_groupby_07(self):
+        """
+        test_groupby_07: Groupby type SUM_COUNT_NA
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = ['f4', 'f5', 'f6']
+        num_rows = 1000
+
+        # -- Data --
+        g = self.gen_dataset_count_with_NA(num_rows)
+        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+
+        # -- Bcolz --
+        print('--> Bcolz')
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+        fact_bcolz.flush()
+
+        fact_bcolz.cache_factor(groupby_cols, refresh=True)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
+                                          sum_type=SUM_COUNT_NA)
+        print result_bcolz
+
+        # Itertools result
+        print('--> Itertools')
+        result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        uniquekeys = result_itt['uniquekeys']
+        print uniquekeys
+
+        ref = []
+        for item in result_itt['groups']:
+            f4 = 0
+            f5 = 0
+            f6 = 0
+            for row in item:
+                f0 = groupby_lambda(row)
+                if row[4] == row[4]:
+                    f4 += 1
+                f5 += 1
+                f6 += 1
+            ref.append([f0, f4, f5, f6])
+
+        assert_list_equal(
+            [list(x) for x in result_bcolz], ref)
+
+    def _get_unique(self, values):
+        new_values = []
+        nan_found = False
+
+        for item in values:
+            if item not in new_values:
+                print item
+                if item == item:
+                    new_values.append(item)
+                else:
+                    if not nan_found:
+                        new_values.append(item)
+                        nan_found = True
+
+
+        return new_values
+
+
+    def gen_dataset_count_with_NA_08(self, N):
+        pool = itertools.cycle(['a', 'a',
+                                'b', 'b', 'b',
+                                'c', 'c', 'c', 'c', 'c'])
+        pool_b = itertools.cycle([0.0, 0.1,
+                                  1.0, 1.0, 1.0,
+                                  3.0, 3.0, 3.0, 3.0, 3.0])
+        pool_c = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
+        pool_d = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
+        pool_e = itertools.cycle([np.nan, 0.0,
+                                  np.nan, 0.0, 1.0,
+                                  np.nan, 3.0, 1.0, 3.0, 3.0])
+        for _ in range(N):
+            d = (
+                pool.next(),
+                pool_b.next(),
+                pool_c.next(),
+                pool_d.next(),
+                pool_e.next(),
+                random.randint(- 10, 10),
+                random.randint(- 10, 10),
+            )
+            yield d
+
+    @attr('dev')
+    def test_groupby_08(self):
+        """
+        test_groupby_08: Groupby's type SUM_SORTED_COUNT_DISTINCT
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = ['f4']
+        num_rows = 20
+
+        # -- Data --
+        g = self.gen_dataset_count_with_NA_08(num_rows)
+        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+        print 'data'
+        print data
+
+        # -- Bcolz --
+        print('--> Bcolz')
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+        fact_bcolz.flush()
+
+        fact_bcolz.cache_factor(groupby_cols, refresh=True)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
+                                          sum_type=SUM_SORTED_COUNT_DISTINCT)
+        print result_bcolz
+        #
+        # # Itertools result
+        print('--> Itertools')
+        result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        uniquekeys = result_itt['uniquekeys']
+        print uniquekeys
+
+        ref = []
+
+        for n, (u, item) in enumerate(zip(uniquekeys, result_itt['groups'])):
+            f4 = len(self._get_unique([x[4] for x in result_itt['groups'][n]]))
+            # f5 = len(self._get_unique([x[5] for x in result_itt['groups'][0]]))
+            # f6 = len(self._get_unique([x[6] for x in result_itt['groups'][0]]))
+            ref.append([u, f4])
+
+        assert_list_equal(
+            [list(x) for x in result_bcolz], ref)
+
+    def _assert_list_equal(self, a, b):
+        assert_list_equal(a, b)
 
     def test_where_terms00(self):
         """

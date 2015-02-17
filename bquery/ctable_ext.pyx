@@ -8,6 +8,13 @@ from libc.string cimport strcpy
 from khash cimport *
 from bcolz.carray_ext cimport carray, chunk
 
+cdef enum:
+    SUM_DEF = 0
+    SUM_COUNT = 1
+    SUM_COUNT_NA = 2
+    SUM_SORTED_COUNT_DISTINCT = 3
+
+
 # Factorize Section
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -405,20 +412,204 @@ def agg_sum(iter_):
 # Aggregation Section
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef sum_float64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
+cdef inline sum_float64_helper(ndarray[npy_float64] out_buffer,
+                       Py_ssize_t current_index,
+                       ndarray[npy_float64] in_buffer,
+                       Py_ssize_t i,
+                       sum_type):
+    cdef:
+        npy_float64 v
+
+    if sum_type == SUM_DEF:
+        out_buffer[current_index] += in_buffer[i]
+    elif sum_type == SUM_COUNT:
+        out_buffer[current_index] += 1
+    elif sum_type == SUM_COUNT_NA:
+        v = in_buffer[i]
+        if v == v:  # skip NA values
+            out_buffer[current_index] += 1
+    elif sum_type == SUM_SORTED_COUNT_DISTINCT:
+        raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef inline sum_int64_helper(ndarray[npy_int64] out_buffer,
+                       Py_ssize_t current_index,
+                       ndarray[npy_int64] in_buffer,
+                       Py_ssize_t i,
+                       sum_type):
+    if sum_type == SUM_DEF:
+        out_buffer[current_index] += in_buffer[i]
+    elif sum_type == SUM_COUNT:
+        out_buffer[current_index] += 1
+    elif sum_type == SUM_COUNT_NA:
+        # TODO: Warning: int does not support NA values, is this what we need?
+        out_buffer[current_index] += 1
+    elif sum_type == SUM_SORTED_COUNT_DISTINCT:
+        raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef inline sum_int32_helper(ndarray[npy_int32] out_buffer,
+                       Py_ssize_t current_index,
+                       ndarray[npy_int32] in_buffer,
+                       Py_ssize_t i,
+                       sum_type):
+    if sum_type == SUM_DEF:
+        out_buffer[current_index] += in_buffer[i]
+    elif sum_type == SUM_COUNT:
+        out_buffer[current_index] += 1
+    elif sum_type == SUM_COUNT_NA:
+        # TODO: Warning: int does not support NA values, is this what we need?
+        out_buffer[current_index] += 1
+    elif sum_type == SUM_SORTED_COUNT_DISTINCT:
+        raise NotImplementedError('SUM_SORTED_COUNT_DISTINCT')
+
+# -- pandas reference --
+# @cython.boundscheck(False)
+# @cython.wraparound(False)
+# def groupsort_indexer(ndarray[int64_t] index, Py_ssize_t ngroups):
+#     cdef:
+#         Py_ssize_t i, loc, label, n
+#         ndarray[int64_t] counts, where, result
+#
+#     # count group sizes, location 0 for NA
+#     counts = np.zeros(ngroups + 1, dtype=np.int64)
+#     n = len(index)
+#     for i from 0 <= i < n:
+#         counts[index[i] + 1] += 1
+#
+#     # mark the start of each contiguous group of like-indexed data
+#     where = np.zeros(ngroups + 1, dtype=np.int64)
+#     for i from 1 <= i < ngroups + 1:
+#         where[i] = where[i - 1] + counts[i - 1]
+#
+#     # this is our indexer
+#     result = np.zeros(n, dtype=np.int64)
+#     for i from 0 <= i < n:
+#         label = index[i] + 1
+#         result[where[label]] = i
+#         where[label] += 1
+#
+#     return result, counts
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def groupsort_indexer(carray index, Py_ssize_t ngroups):
+    cdef:
+        Py_ssize_t i, label, n
+        ndarray[int64_t] counts, where, np_result
+        # --
+        carray c_result
+        chunk input_chunk, index_chunk
+        Py_ssize_t index_chunk_nr, index_chunk_len, leftover_elements
+
+    index_chunk_len = index.chunklen
+    in_buffer = np.empty(index_chunk_len, dtype='float64')
+    index_chunk_nr = 0
+
+    # count group sizes, location 0 for NA
+    counts = np.zeros(ngroups + 1, dtype=np.int64)
+    n = len(index)
+
+    for index_chunk_nr in range(index.nchunks):
+        # fill input buffer
+        input_chunk = index.chunks[index_chunk_nr]
+        input_chunk._getitem(0, index_chunk_len, in_buffer.data)
+
+        # loop through rows
+        for i in range(index_chunk_len):
+            counts[index[i] + 1] += 1
+
+    leftover_elements = cython.cdiv(index.leftover, index.atomsize)
+    if leftover_elements > 0:
+        # fill input buffer
+        in_buffer = index.leftover_array
+
+        # loop through rows
+        for i in range(leftover_elements):
+            counts[index[i] + 1] += 1
+
+    # mark the start of each contiguous group of like-indexed data
+    where = np.zeros(ngroups + 1, dtype=np.int64)
+    for i from 1 <= i < ngroups + 1:
+        where[i] = where[i - 1] + counts[i - 1]
+
+    # this is our indexer
+    np_result = np.zeros(n, dtype=np.int64)
+    for i from 0 <= i < n:
+        label = index[i] + 1
+        np_result[where[label]] = i
+        where[label] += 1
+
+    # c_result = carray(np_result, dtype='int64', expectedlen=n)
+
+    return np_result, counts
+
+cdef unique(ndarray[float64_t] values):
+    cdef:
+        Py_ssize_t i, n = len(values)
+        Py_ssize_t idx, count = 0
+        int ret = 0
+        float64_t val
+        npy_uint64 k
+        carray uniques = carray([], dtype='float64')
+        bint seen_na = 0
+        kh_float64_t *table
+
+    table = kh_init_float64()
+
+    for i in range(n):
+        val = values[i]
+
+        if val == val:
+            k = kh_get_float64(table, val)
+            if k == table.n_buckets:
+                k = kh_put_float64(table, val, &ret)
+                uniques.append(val)
+                count += 1
+        elif not seen_na:
+            seen_na = 1
+            uniques.append(np.nan)
+
+    kh_destroy_float64(table)
+
+    return uniques
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef sum_float64(carray ca_input, carray ca_factor,
+                 Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM_DEF):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, factor_total_chunks, leftover_elements
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
 
         ndarray[npy_float64] in_buffer
         ndarray[npy_int64] factor_buffer
         ndarray[npy_float64] out_buffer
 
+        carray num_uniques
+
     count = 0
     ret = 0
     reverse = {}
+
+    if sum_type == SUM_SORTED_COUNT_DISTINCT:
+        num_uniques = carray([], dtype='int64')
+        positions, counts = groupsort_indexer(ca_factor, nr_groups)
+        start_counts = 0
+        end_counts = 0
+        for j in range(len(counts) - 1):
+            start_counts = end_counts
+            end_counts = start_counts + counts[j + 1]
+            positions[start_counts:end_counts]
+            num_uniques.append(
+                len(unique(ca_input[positions[start_counts:end_counts]]))
+            )
+
+        return num_uniques
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='float64')
@@ -458,7 +649,8 @@ cdef sum_float64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssi
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_float64_helper(out_buffer, current_index,
+                                   in_buffer, i, sum_type)
 
     leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
     if leftover_elements > 0:
@@ -484,7 +676,8 @@ cdef sum_float64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssi
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_float64_helper(out_buffer, current_index,
+                                   in_buffer, i, sum_type)
 
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
@@ -494,7 +687,8 @@ cdef sum_float64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssi
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef sum_int32(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
+cdef sum_int32(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM_DEF):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -508,6 +702,10 @@ cdef sum_int32(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize
     count = 0
     ret = 0
     reverse = {}
+
+    if sum_type == SUM_SORTED_COUNT_DISTINCT:
+        c_result, counts = groupsort_indexer(ca_factor, nr_groups)
+        return counts
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='int32')
@@ -547,7 +745,8 @@ cdef sum_int32(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_int32_helper(out_buffer, current_index,
+                                 in_buffer, i, sum_type)
 
     leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
     if leftover_elements > 0:
@@ -573,7 +772,8 @@ cdef sum_int32(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_int32_helper(out_buffer, current_index,
+                                 in_buffer, i, sum_type)
 
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
@@ -583,7 +783,8 @@ cdef sum_int32(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef sum_int64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
+cdef sum_int64(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM_DEF):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -597,6 +798,10 @@ cdef sum_int64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize
     count = 0
     ret = 0
     reverse = {}
+
+    if sum_type == SUM_SORTED_COUNT_DISTINCT:
+        c_result, counts = groupsort_indexer(ca_factor, nr_groups)
+        return counts
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='int64')
@@ -636,7 +841,8 @@ cdef sum_int64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_int64_helper(out_buffer, current_index,
+                                 in_buffer, i, sum_type)
 
     leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
     if leftover_elements > 0:
@@ -662,7 +868,8 @@ cdef sum_int64(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                out_buffer[current_index] += in_buffer[i]
+                sum_int64_helper(out_buffer, current_index,
+                                 in_buffer, i, sum_type)
 
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
@@ -764,7 +971,8 @@ def aggregate_groups_by_iter_2(ct_input,
                         carray factor_carray,
                         groupby_cols,
                         output_agg_ops,
-                        dtype_list
+                        dtype_list,
+                        sum_type=SUM_DEF
                         ):
     total = []
 
@@ -775,11 +983,20 @@ def aggregate_groups_by_iter_2(ct_input,
         # TODO: input vs output column
         col_dtype = ct_agg[col].dtype
         if col_dtype == np.float64:
-            total.append(sum_float64(ct_input[col], factor_carray, nr_groups, skip_key))
+            total.append(
+                sum_float64(ct_input[col], factor_carray, nr_groups, skip_key,
+                            sum_type=sum_type)
+            )
         elif col_dtype == np.int64:
-            total.append(sum_int64(ct_input[col], factor_carray, nr_groups, skip_key))
+            total.append(
+                sum_int64(ct_input[col], factor_carray, nr_groups, skip_key,
+                          sum_type=sum_type)
+            )
         elif col_dtype == np.int32:
-            total.append(sum_int32(ct_input[col], factor_carray, nr_groups, skip_key))
+            total.append(
+                sum_int32(ct_input[col], factor_carray, nr_groups, skip_key,
+                          sum_type=sum_type)
+            )
         else:
             raise NotImplementedError(
                 'Column dtype ({0}) not supported for aggregation yet '
