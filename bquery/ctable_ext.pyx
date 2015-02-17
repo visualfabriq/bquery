@@ -467,7 +467,7 @@ cdef count_unique_float64(ndarray[float64_t] values):
         Py_ssize_t idx
         int ret = 0
         float64_t val
-        npy_uint64 k
+        khiter_t k
         npy_uint64 count = 0
         bint seen_na = 0
         kh_float64_t *table
@@ -496,7 +496,7 @@ cdef count_unique_int64(ndarray[int64_t] values):
         Py_ssize_t idx
         int ret = 0
         int64_t val
-        npy_uint64 k
+        khiter_t k
         npy_uint64 count = 0
         kh_int64_t *table
 
@@ -521,7 +521,7 @@ cdef count_unique_int32(ndarray[int32_t] values):
         Py_ssize_t idx
         int ret = 0
         int32_t val
-        npy_uint64 k
+        khiter_t k
         npy_uint64 count = 0
         kh_int32_t *table
 
