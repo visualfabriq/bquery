@@ -564,7 +564,7 @@ cdef sum_float64(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
-    if sum_type == SORTED_COUNT_DISTINCT:
+    if sum_type == COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
@@ -689,7 +689,7 @@ cdef sum_int32(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
-    if sum_type == SORTED_COUNT_DISTINCT:
+    if sum_type == COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
@@ -812,7 +812,7 @@ cdef sum_int64(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
-    if sum_type == SORTED_COUNT_DISTINCT:
+    if sum_type == COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
