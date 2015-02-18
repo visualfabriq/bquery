@@ -568,8 +568,10 @@ cdef sum_float64(carray ca_input, carray ca_factor,
         ndarray[npy_float64] in_buffer
         ndarray[npy_int64] factor_buffer
         ndarray[npy_float64] out_buffer
+        ndarray[npy_float64] last_values
 
         npy_float64 v
+        bint count_distinct_started = 0
         carray num_uniques
 
 
@@ -638,6 +640,18 @@ cdef sum_float64(carray ca_input, carray ca_factor,
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
+                elif agg_method == _SORTED_COUNT_DISTINCT:
+                    v = in_buffer[i]
+                    if not count_distinct_started:
+                        count_distinct_started = 1
+                        last_values = np.zeros(nr_groups, dtype='float64')
+                        last_values[0] = v
+                        out_buffer[0] = 1
+                    else:
+                        if v != last_values[current_index]:
+                            out_buffer[current_index] += 1
+
+                    last_values[current_index] = v
                 else:
                     raise NotImplementedError('sumtype not supported')
 
@@ -673,6 +687,18 @@ cdef sum_float64(carray ca_input, carray ca_factor,
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
+                elif agg_method == _SORTED_COUNT_DISTINCT:
+                    v = in_buffer[i]
+                    if not count_distinct_started:
+                        count_distinct_started = 1
+                        last_values = np.zeros(nr_groups, dtype='float64')
+                        last_values[0] = v
+                        out_buffer[0] = 1
+                    else:
+                        if v != last_values[current_index]:
+                            out_buffer[current_index] += 1
+
+                    last_values[current_index] = v
                 else:
                     raise NotImplementedError('sumtype not supported')
 
@@ -695,7 +721,10 @@ cdef sum_int32(carray ca_input, carray ca_factor,
         ndarray[npy_int32] in_buffer
         ndarray[npy_int64] factor_buffer
         ndarray[npy_int32] out_buffer
+        ndarray[npy_int32] last_values
 
+        npy_int32 v
+        bint count_distinct_started = 0
         carray num_uniques
 
     count = 0
@@ -762,6 +791,18 @@ cdef sum_int32(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
+                elif agg_method == _SORTED_COUNT_DISTINCT:
+                    v = in_buffer[i]
+                    if not count_distinct_started:
+                        count_distinct_started = 1
+                        last_values = np.zeros(nr_groups, dtype='int32')
+                        last_values[0] = v
+                        out_buffer[0] = 1
+                    else:
+                        if v != last_values[current_index]:
+                            out_buffer[current_index] += 1
+
+                    last_values[current_index] = v
                 else:
                     raise NotImplementedError('sumtype not supported')
 
@@ -796,6 +837,18 @@ cdef sum_int32(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
+                elif agg_method == _SORTED_COUNT_DISTINCT:
+                    v = in_buffer[i]
+                    if not count_distinct_started:
+                        count_distinct_started = 1
+                        last_values = np.zeros(nr_groups, dtype='int32')
+                        last_values[0] = v
+                        out_buffer[0] = 1
+                    else:
+                        if v != last_values[current_index]:
+                            out_buffer[current_index] += 1
+
+                    last_values[current_index] = v
                 else:
                     raise NotImplementedError('sumtype not supported')
 
@@ -818,7 +871,10 @@ cdef sum_int64(carray ca_input, carray ca_factor,
         ndarray[npy_int64] in_buffer
         ndarray[npy_int64] factor_buffer
         ndarray[npy_int64] out_buffer
+        ndarray[npy_int64] last_values
 
+        npy_int64 v
+        bint count_distinct_started = 0
         carray num_uniques
 
     count = 0
@@ -885,6 +941,18 @@ cdef sum_int64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
+                elif agg_method == _SORTED_COUNT_DISTINCT:
+                    v = in_buffer[i]
+                    if not count_distinct_started:
+                        count_distinct_started = 1
+                        last_values = np.zeros(nr_groups, dtype='int64')
+                        last_values[0] = v
+                        out_buffer[0] = 1
+                    else:
+                        if v != last_values[current_index]:
+                            out_buffer[current_index] += 1
+
+                    last_values[current_index] = v
                 else:
                     raise NotImplementedError('sumtype not supported')
 
@@ -919,6 +987,18 @@ cdef sum_int64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
+                elif agg_method == _SORTED_COUNT_DISTINCT:
+                    v = in_buffer[i]
+                    if not count_distinct_started:
+                        count_distinct_started = 1
+                        last_values = np.zeros(nr_groups, dtype='int64')
+                        last_values[0] = v
+                        out_buffer[0] = 1
+                    else:
+                        if v != last_values[current_index]:
+                            out_buffer[current_index] += 1
+
+                    last_values[current_index] = v
                 else:
                     raise NotImplementedError('sumtype not supported')
 

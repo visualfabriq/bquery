@@ -526,9 +526,11 @@ class TestCtable():
                                   3.0, 3.0, 3.0, 4.0, 3.0])
         pool_c = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
         pool_d = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
-        pool_e = itertools.cycle([np.nan, 0.1,
-                                  np.nan, 0.0, 0.2,
-                                  np.nan, 0.3, 0.0, 0.1, 0.4])
+        pool_e = itertools.cycle([0.0, 0.1,
+                                  0.1, 0.2, 0.2,
+                                  0.3, 0.3, 0.4, 0.4, 0.5])
+        pool_f = itertools.cycle([0,0,1,1,2,2,3,4,5,5])
+        pool_g = itertools.cycle([0,0,1,1,2,2,3,4,5,6])
         for _ in range(N):
             d = (
                 pool.next(),
@@ -537,11 +539,12 @@ class TestCtable():
                 pool_d.next(),
                 # --
                 pool_e.next(),
-                random.randint(- 500, 500),
-                random.randint(- 100, 100),
+                pool_f.next(),
+                pool_g.next(),
             )
             yield d
 
+    @attr('dev')
     def test_groupby_09(self):
         """
         test_groupby_08: Groupby's type SORTED_COUNT_DISTINCT
@@ -550,17 +553,14 @@ class TestCtable():
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
-        agg_list = ['f4', 'f5', 'f6']
-        num_rows = 2000
+        agg_list = ['f5', 'f6']
+        num_rows = 10  # do not change without adapting the genrator
 
         # -- Data --
         g = self.gen_dataset_count_with_NA_09(num_rows)
         data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
         print 'data'
         print data
-
-        data.sort()
-
 
         # -- Bcolz --
         print('--> Bcolz')
@@ -586,7 +586,8 @@ class TestCtable():
             f4 = len(self._get_unique([x[4] for x in result_itt['groups'][n]]))
             f5 = len(self._get_unique([x[5] for x in result_itt['groups'][n]]))
             f6 = len(self._get_unique([x[6] for x in result_itt['groups'][n]]))
-            ref.append([u, f4, f5, f6])
+            ref.append([u, f5, f6])
+        print ref
 
         assert_list_equal(
             [list(x) for x in result_bcolz], ref)
