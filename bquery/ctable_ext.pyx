@@ -8,11 +8,12 @@ from libc.string cimport strcpy
 from khash cimport *
 from bcolz.carray_ext cimport carray, chunk
 
-DEF SUM = "sum"
-DEF COUNT = "count"
-DEF COUNT_NA = "count_na"
-DEF COUNT_DISTINCT = "count_distinct"
-DEF SORTED_COUNT_DISTINCT = "sorted_count_distinct"
+cdef enum:
+    SUM = 0
+    COUNT = 1
+    COUNT_NA = 2
+    COUNT_DISTINCT = 3
+    SORTED_COUNT_DISTINCT = 4
 
 
 # Factorize Section

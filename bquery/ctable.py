@@ -8,11 +8,11 @@ from collections import namedtuple
 import os
 
 # TODO: import declaration from ctable_ext.so
-SUM = "sum"
-COUNT = "count"
-COUNT_NA = "count_na"
-COUNT_DISTINCT = "count_distinct"
-SORTED_COUNT_DISTINCT = "sorted_count_distinct"
+SUM = 0
+COUNT = 1
+COUNT_NA = 2
+COUNT_DISTINCT = 3
+SORTED_COUNT_DISTINCT = 4
 
 class ctable(bcolz.ctable):
     def cache_factor(self, col_list, refresh=False):
