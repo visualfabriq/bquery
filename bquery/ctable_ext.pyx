@@ -545,7 +545,7 @@ cdef count_unique_int32(ndarray[int32_t] values):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_float64(carray ca_input, carray ca_factor,
-                 Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM):
+                 Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=SUM):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -564,7 +564,7 @@ cdef sum_float64(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
-    if sum_type == COUNT_DISTINCT:
+    if agg_method == COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
@@ -617,11 +617,11 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if sum_type == SUM:
+                if agg_method == SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif sum_type == COUNT:
+                elif agg_method == COUNT:
                     out_buffer[current_index] += 1
-                elif sum_type == COUNT_NA:
+                elif agg_method == COUNT_NA:
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
@@ -652,11 +652,11 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if sum_type == SUM:
+                if agg_method == SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif sum_type == COUNT:
+                elif agg_method == COUNT:
                     out_buffer[current_index] += 1
-                elif sum_type == COUNT_NA:
+                elif agg_method == COUNT_NA:
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
@@ -672,7 +672,7 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_int32(carray ca_input, carray ca_factor,
-               Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM):
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=SUM):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -689,7 +689,7 @@ cdef sum_int32(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
-    if sum_type == COUNT_DISTINCT:
+    if agg_method == COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
@@ -742,11 +742,11 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if sum_type == SUM:
+                if agg_method == SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif sum_type == COUNT:
+                elif agg_method == COUNT:
                     out_buffer[current_index] += 1
-                elif sum_type == COUNT_NA:
+                elif agg_method == COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 else:
@@ -776,11 +776,11 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if sum_type == SUM:
+                if agg_method == SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif sum_type == COUNT:
+                elif agg_method == COUNT:
                     out_buffer[current_index] += 1
-                elif sum_type == COUNT_NA:
+                elif agg_method == COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 else:
@@ -795,7 +795,7 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_int64(carray ca_input, carray ca_factor,
-               Py_ssize_t nr_groups, Py_ssize_t skip_key, sum_type=SUM):
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=SUM):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -812,7 +812,7 @@ cdef sum_int64(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
-    if sum_type == COUNT_DISTINCT:
+    if agg_method == COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
@@ -865,11 +865,11 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if sum_type == SUM:
+                if agg_method == SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif sum_type == COUNT:
+                elif agg_method == COUNT:
                     out_buffer[current_index] += 1
-                elif sum_type == COUNT_NA:
+                elif agg_method == COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 else:
@@ -899,11 +899,11 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if sum_type == SUM:
+                if agg_method == SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif sum_type == COUNT:
+                elif agg_method == COUNT:
                     out_buffer[current_index] += 1
-                elif sum_type == COUNT_NA:
+                elif agg_method == COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 else:
@@ -1010,7 +1010,7 @@ def aggregate_groups_by_iter_2(ct_input,
                         groupby_cols,
                         output_agg_ops,
                         dtype_list,
-                        sum_type=SUM
+                        agg_method=SUM
                         ):
     total = []
 
@@ -1023,17 +1023,17 @@ def aggregate_groups_by_iter_2(ct_input,
         if col_dtype == np.float64:
             total.append(
                 sum_float64(ct_input[col], factor_carray, nr_groups, skip_key,
-                            sum_type=sum_type)
+                            agg_method=agg_method)
             )
         elif col_dtype == np.int64:
             total.append(
                 sum_int64(ct_input[col], factor_carray, nr_groups, skip_key,
-                          sum_type=sum_type)
+                          agg_method=agg_method)
             )
         elif col_dtype == np.int32:
             total.append(
                 sum_int32(ct_input[col], factor_carray, nr_groups, skip_key,
-                          sum_type=sum_type)
+                          agg_method=agg_method)
             )
         else:
             raise NotImplementedError(

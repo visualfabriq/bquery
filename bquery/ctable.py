@@ -54,7 +54,7 @@ class ctable(bcolz.ctable):
                 carray_values.flush()
 
     def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None,
-                sum_type=SUM):
+                agg_method=SUM):
         """
         Aggregate the ctable
 
@@ -94,7 +94,7 @@ class ctable(bcolz.ctable):
         ctable_ext.aggregate_groups_by_iter_2(self, ct_agg, nr_groups, skip_key,
                                               factor_carray, groupby_cols,
                                               agg_ops, dtype_list,
-                                              sum_type=sum_type)
+                                              agg_method=agg_method)
 
         return ct_agg
 

@@ -357,7 +357,7 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          sum_type=COUNT)
+                                          agg_method=COUNT)
         print result_bcolz
 
         # Itertools result
@@ -405,7 +405,7 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          sum_type=COUNT_NA)
+                                          agg_method=COUNT_NA)
         print result_bcolz
 
         # Itertools result
@@ -498,7 +498,7 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          sum_type=COUNT_DISTINCT)
+                                          agg_method=COUNT_DISTINCT)
         print result_bcolz
         #
         # # Itertools result
