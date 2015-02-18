@@ -8,13 +8,25 @@ from libc.string cimport strcpy
 from khash cimport *
 from bcolz.carray_ext cimport carray, chunk
 
-cdef enum:
-    SUM = 0
-    COUNT = 1
-    COUNT_NA = 2
-    COUNT_DISTINCT = 3
-    SORTED_COUNT_DISTINCT = 4
+# ----------------------------------------------------------------------------
+#                        GLOBAL DEFINITIONS
+# ----------------------------------------------------------------------------
 
+SUM = 0
+DEF _SUM = 0
+
+COUNT = 1
+DEF _COUNT = 1
+
+COUNT_NA = 2
+DEF _COUNT_NA = 2
+
+COUNT_DISTINCT = 3
+DEF _COUNT_DISTINCT = 3
+
+SORTED_COUNT_DISTINCT = 4
+DEF _SORTED_COUNT_DISTINCT = 4
+# ----------------------------------------------------------------------------
 
 # Factorize Section
 @cython.wraparound(False)
@@ -546,7 +558,7 @@ cdef count_unique_int32(ndarray[int32_t] values):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_float64(carray ca_input, carray ca_factor,
-                 Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=SUM):
+                 Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -565,7 +577,7 @@ cdef sum_float64(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
-    if agg_method == COUNT_DISTINCT:
+    if agg_method == _COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
@@ -618,11 +630,11 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if agg_method == SUM:
+                if agg_method == _SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif agg_method == COUNT:
+                elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
-                elif agg_method == COUNT_NA:
+                elif agg_method == _COUNT_NA:
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
@@ -653,11 +665,11 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if agg_method == SUM:
+                if agg_method == _SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif agg_method == COUNT:
+                elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
-                elif agg_method == COUNT_NA:
+                elif agg_method == _COUNT_NA:
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
@@ -673,7 +685,7 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_int32(carray ca_input, carray ca_factor,
-               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=SUM):
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -690,7 +702,7 @@ cdef sum_int32(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
-    if agg_method == COUNT_DISTINCT:
+    if agg_method == _COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
@@ -743,11 +755,11 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if agg_method == SUM:
+                if agg_method == _SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif agg_method == COUNT:
+                elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
-                elif agg_method == COUNT_NA:
+                elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 else:
@@ -777,11 +789,11 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if agg_method == SUM:
+                if agg_method == _SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif agg_method == COUNT:
+                elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
-                elif agg_method == COUNT_NA:
+                elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 else:
@@ -796,7 +808,7 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_int64(carray ca_input, carray ca_factor,
-               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=SUM):
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -813,7 +825,7 @@ cdef sum_int64(carray ca_input, carray ca_factor,
     ret = 0
     reverse = {}
 
-    if agg_method == COUNT_DISTINCT:
+    if agg_method == _COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
@@ -866,11 +878,11 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if agg_method == SUM:
+                if agg_method == _SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif agg_method == COUNT:
+                elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
-                elif agg_method == COUNT_NA:
+                elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 else:
@@ -900,11 +912,11 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if agg_method == SUM:
+                if agg_method == _SUM:
                     out_buffer[current_index] += in_buffer[i]
-                elif agg_method == COUNT:
+                elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
-                elif agg_method == COUNT_NA:
+                elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 else:
@@ -1011,7 +1023,7 @@ def aggregate_groups_by_iter_2(ct_input,
                         groupby_cols,
                         output_agg_ops,
                         dtype_list,
-                        agg_method=SUM
+                        agg_method=_SUM
                         ):
     total = []
 

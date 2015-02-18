@@ -6,13 +6,7 @@ import numpy as np
 import bcolz
 from collections import namedtuple
 import os
-
-# TODO: import declaration from ctable_ext.so
-SUM = 0
-COUNT = 1
-COUNT_NA = 2
-COUNT_DISTINCT = 3
-SORTED_COUNT_DISTINCT = 4
+from bquery.ctable_ext import SUM
 
 class ctable(bcolz.ctable):
     def cache_factor(self, col_list, refresh=False):

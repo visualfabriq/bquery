@@ -12,8 +12,8 @@ from numpy.testing import assert_array_equal
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
 import itertools as itt
-from bquery.ctable import \
-    SUM, COUNT, COUNT_NA, SORTED_COUNT_DISTINCT, COUNT_DISTINCT
+from bquery.ctable_ext import \
+    SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
 
 class TestCtable():
     def setup(self):
