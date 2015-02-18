@@ -8,10 +8,11 @@ from collections import namedtuple
 import os
 
 # TODO: import declaration from ctable_ext.so
-SUM_DEF = 0
-SUM_COUNT = 1
-SUM_COUNT_NA = 2
-SUM_SORTED_COUNT_DISTINCT = 3
+SUM = "sum"
+COUNT = "count"
+COUNT_NA = "count_na"
+COUNT_DISTINCT = "count_distinct"
+SORTED_COUNT_DISTINCT = "sorted_count_distinct"
 
 class ctable(bcolz.ctable):
     def cache_factor(self, col_list, refresh=False):
@@ -53,7 +54,7 @@ class ctable(bcolz.ctable):
                 carray_values.flush()
 
     def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None,
-                sum_type=SUM_DEF):
+                sum_type=SUM):
         """
         Aggregate the ctable
 

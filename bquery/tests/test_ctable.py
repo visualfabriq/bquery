@@ -12,7 +12,8 @@ from numpy.testing import assert_array_equal
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
 import itertools as itt
-from bquery.ctable import SUM_DEF, SUM_COUNT, SUM_COUNT_NA, SUM_SORTED_COUNT_DISTINCT
+from bquery.ctable import \
+    SUM, COUNT, COUNT_NA, SORTED_COUNT_DISTINCT, COUNT_DISTINCT
 
 class TestCtable():
     def setup(self):
@@ -334,7 +335,7 @@ class TestCtable():
 
     def test_groupby_06(self):
         """
-        test_groupby_06: Groupby type SUM_COUNT
+        test_groupby_06: Groupby type COUNT
         """
         random.seed(1)
 
@@ -356,7 +357,7 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          sum_type=SUM_COUNT)
+                                          sum_type=COUNT)
         print result_bcolz
 
         # Itertools result
@@ -382,7 +383,7 @@ class TestCtable():
 
     def test_groupby_07(self):
         """
-        test_groupby_07: Groupby type SUM_COUNT_NA
+        test_groupby_07: Groupby type COUNT_NA
         """
         random.seed(1)
 
@@ -404,7 +405,7 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          sum_type=SUM_COUNT_NA)
+                                          sum_type=COUNT_NA)
         print result_bcolz
 
         # Itertools result
@@ -473,7 +474,7 @@ class TestCtable():
     @attr('dev')
     def test_groupby_08(self):
         """
-        test_groupby_08: Groupby's type SUM_SORTED_COUNT_DISTINCT
+        test_groupby_08: Groupby's type SORTED_COUNT_DISTINCT
         """
         random.seed(1)
 
@@ -497,7 +498,7 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          sum_type=SUM_SORTED_COUNT_DISTINCT)
+                                          sum_type=SORTED_COUNT_DISTINCT)
         print result_bcolz
         #
         # # Itertools result
