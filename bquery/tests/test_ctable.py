@@ -471,7 +471,6 @@ class TestCtable():
             )
             yield d
 
-    @attr('dev')
     def test_groupby_08(self):
         """
         test_groupby_08: Groupby's type SORTED_COUNT_DISTINCT
@@ -501,6 +500,80 @@ class TestCtable():
                                           agg_method=COUNT_DISTINCT)
         print result_bcolz
         #
+        # # Itertools result
+        print('--> Itertools')
+        result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        uniquekeys = result_itt['uniquekeys']
+        print uniquekeys
+
+        ref = []
+
+        for n, (u, item) in enumerate(zip(uniquekeys, result_itt['groups'])):
+            f4 = len(self._get_unique([x[4] for x in result_itt['groups'][n]]))
+            f5 = len(self._get_unique([x[5] for x in result_itt['groups'][n]]))
+            f6 = len(self._get_unique([x[6] for x in result_itt['groups'][n]]))
+            ref.append([u, f4, f5, f6])
+
+        assert_list_equal(
+            [list(x) for x in result_bcolz], ref)
+
+    def gen_dataset_count_with_NA_09(self, N):
+        pool = itertools.cycle(['a', 'a',
+                                'b', 'b', 'b',
+                                'c', 'c', 'c', 'c', 'c'])
+        pool_b = itertools.cycle([0.0, 0.1,
+                                  1.0, 1.0, 1.0,
+                                  3.0, 3.0, 3.0, 4.0, 3.0])
+        pool_c = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
+        pool_d = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
+        pool_e = itertools.cycle([np.nan, 0.1,
+                                  np.nan, 0.0, 0.2,
+                                  np.nan, 0.3, 0.0, 0.1, 0.4])
+        for _ in range(N):
+            d = (
+                pool.next(),
+                pool_b.next(),
+                pool_c.next(),
+                pool_d.next(),
+                # --
+                pool_e.next(),
+                random.randint(- 500, 500),
+                random.randint(- 100, 100),
+            )
+            yield d
+
+    def test_groupby_09(self):
+        """
+        test_groupby_08: Groupby's type SORTED_COUNT_DISTINCT
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = ['f4', 'f5', 'f6']
+        num_rows = 2000
+
+        # -- Data --
+        g = self.gen_dataset_count_with_NA_09(num_rows)
+        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+        print 'data'
+        print data
+
+        data.sort()
+
+
+        # -- Bcolz --
+        print('--> Bcolz')
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+        fact_bcolz.flush()
+
+        fact_bcolz.cache_factor(groupby_cols, refresh=True)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
+                                          agg_method=SORTED_COUNT_DISTINCT)
+        print result_bcolz
+
         # # Itertools result
         print('--> Itertools')
         result_itt = self.helper_itt_groupby(data, groupby_lambda)
