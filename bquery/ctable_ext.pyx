@@ -421,8 +421,10 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
         chunk input_chunk, index_chunk
         Py_ssize_t index_chunk_nr, index_chunk_len, leftover_elements
 
+        ndarray[int64_t] in_buffer
+
     index_chunk_len = index.chunklen
-    in_buffer = np.empty(index_chunk_len, dtype='float64')
+    in_buffer = np.empty(index_chunk_len, dtype='int64')
     index_chunk_nr = 0
 
     # count group sizes, location 0 for NA
