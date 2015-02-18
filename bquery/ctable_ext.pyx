@@ -563,11 +563,7 @@ cdef sum_float64(carray ca_input, carray ca_factor,
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t i, j
-        Py_ssize_t end_counts, start_counts
-        Py_ssize_t factor_total_chunks, leftover_elements
-        Py_ssize_t current_index
-        Py_ssize_t previous_index = -1
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
 
         ndarray[npy_float64] in_buffer
         ndarray[npy_int64] factor_buffer
@@ -575,13 +571,6 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 
         npy_float64 v
         carray num_uniques
-
-        int ret = 0
-        kh_float64_t *table_distinct
-        npy_uint64 count = 0
-        khint_t kk
-        bint seen_na = 0
-
 
 
     count = 0
@@ -602,9 +591,6 @@ cdef sum_float64(carray ca_input, carray ca_factor,
             )
 
         return num_uniques
-
-    if agg_method == _SORTED_COUNT_DISTINCT:
-        table_distinct = kh_init_float64()
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='float64')
@@ -652,29 +638,6 @@ cdef sum_float64(carray ca_input, carray ca_factor,
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if previous_index == current_index:
-                        if v == v:
-                            kk = kh_get_float64(table_distinct, v)
-                            if kk == table_distinct.n_buckets:
-                                kk = kh_put_float64(table_distinct, v, &ret)
-                                count += 1
-                        elif not seen_na:
-                            seen_na = 1
-                            count += 1
-                    else:  # reset conditions
-                        kh_destroy_float64(table_distinct)
-                        table_distinct = kh_init_float64()
-                        count = 1
-                        seen_na = 0
-                        if v == v:
-                            kk = kh_put_float64(table_distinct, v, &ret)
-                        elif not seen_na:
-                            seen_na = 1
-                        previous_index = current_index
-
-                    out_buffer[current_index] = count
                 else:
                     raise NotImplementedError('sumtype not supported')
 
@@ -710,34 +673,9 @@ cdef sum_float64(carray ca_input, carray ca_factor,
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if previous_index == current_index:
-                        if v == v:
-                            kk = kh_get_float64(table_distinct, v)
-                            if kk == table_distinct.n_buckets:
-                                kk = kh_put_float64(table_distinct, v, &ret)
-                                count += 1
-                        elif not seen_na:
-                            seen_na = 1
-                            count += 1
-                    else:  # reset conditions
-                        kh_destroy_float64(table_distinct)
-                        table_distinct = kh_init_float64()
-                        count = 1
-                        seen_na = 0
-                        if v == v:
-                            kk = kh_put_float64(table_distinct, v, &ret)
-                        elif not seen_na:
-                            seen_na = 1
-                        previous_index = current_index
-
-                    out_buffer[current_index] = count
                 else:
                     raise NotImplementedError('sumtype not supported')
 
-    if agg_method == _SORTED_COUNT_DISTINCT:
-        kh_destroy_float64(table_distinct)
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
         np.delete(out_buffer, skip_key)
@@ -752,23 +690,13 @@ cdef sum_int32(carray ca_input, carray ca_factor,
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t i, j
-        Py_ssize_t end_counts, start_counts
-        Py_ssize_t factor_total_chunks, leftover_elements
-        Py_ssize_t current_index
-        Py_ssize_t previous_index = -1
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
 
         ndarray[npy_int32] in_buffer
         ndarray[npy_int64] factor_buffer
         ndarray[npy_int32] out_buffer
 
-        npy_int32 v
         carray num_uniques
-
-        int ret = 0
-        kh_int32_t *table_distinct
-        npy_uint64 count = 0
-        khint_t kk
 
     count = 0
     ret = 0
@@ -788,9 +716,6 @@ cdef sum_int32(carray ca_input, carray ca_factor,
             )
 
         return num_uniques
-
-    if agg_method == _SORTED_COUNT_DISTINCT:
-        table_distinct = kh_init_int32()
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='int32')
@@ -837,21 +762,6 @@ cdef sum_int32(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if previous_index == current_index:
-                        kk = kh_get_int32(table_distinct, v)
-                        if kk == table_distinct.n_buckets:
-                            kk = kh_put_int32(table_distinct, v, &ret)
-                            count += 1
-                    else:  # reset conditions
-                        kh_destroy_int32(table_distinct)
-                        table_distinct = kh_init_int32()
-                        count = 1
-                        kk = kh_put_int32(table_distinct, v, &ret)
-                        previous_index = current_index
-
-                    out_buffer[current_index] = count
                 else:
                     raise NotImplementedError('sumtype not supported')
 
@@ -886,26 +796,9 @@ cdef sum_int32(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if previous_index == current_index:
-                        kk = kh_get_int32(table_distinct, v)
-                        if kk == table_distinct.n_buckets:
-                            kk = kh_put_int32(table_distinct, v, &ret)
-                            count += 1
-                    else:  # reset conditions
-                        kh_destroy_int32(table_distinct)
-                        table_distinct = kh_init_int32()
-                        count = 1
-                        kk = kh_put_int32(table_distinct, v, &ret)
-                        previous_index = current_index
-
-                    out_buffer[current_index] = count
                 else:
                     raise NotImplementedError('sumtype not supported')
 
-    if agg_method == _SORTED_COUNT_DISTINCT:
-        kh_destroy_int32(table_distinct)
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
         np.delete(out_buffer, skip_key)
@@ -920,23 +813,13 @@ cdef sum_int64(carray ca_input, carray ca_factor,
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t i, j
-        Py_ssize_t end_counts, start_counts
-        Py_ssize_t factor_total_chunks, leftover_elements
-        Py_ssize_t current_index
-        Py_ssize_t previous_index = -1
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
 
         ndarray[npy_int64] in_buffer
         ndarray[npy_int64] factor_buffer
         ndarray[npy_int64] out_buffer
 
-        npy_int64 v
         carray num_uniques
-
-        int ret = 0
-        kh_int64_t *table_distinct
-        npy_uint64 count = 0
-        khint_t kk
 
     count = 0
     ret = 0
@@ -956,9 +839,6 @@ cdef sum_int64(carray ca_input, carray ca_factor,
             )
 
         return num_uniques
-
-    if agg_method == _SORTED_COUNT_DISTINCT:
-        table_distinct = kh_init_int64()
 
     input_chunk_len = ca_input.chunklen
     in_buffer = np.empty(input_chunk_len, dtype='int64')
@@ -1005,21 +885,6 @@ cdef sum_int64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if previous_index == current_index:
-                        kk = kh_get_int64(table_distinct, v)
-                        if kk == table_distinct.n_buckets:
-                            kk = kh_put_int64(table_distinct, v, &ret)
-                            count += 1
-                    else:  # reset conditions
-                        kh_destroy_int64(table_distinct)
-                        table_distinct = kh_init_int64()
-                        count = 1
-                        kk = kh_put_int64(table_distinct, v, &ret)
-                        previous_index = current_index
-
-                    out_buffer[current_index] = count
                 else:
                     raise NotImplementedError('sumtype not supported')
 
@@ -1054,26 +919,9 @@ cdef sum_int64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if previous_index == current_index:
-                        kk = kh_get_int64(table_distinct, v)
-                        if kk == table_distinct.n_buckets:
-                            kk = kh_put_int64(table_distinct, v, &ret)
-                            count += 1
-                    else:  # reset conditions
-                        kh_destroy_int64(table_distinct)
-                        table_distinct = kh_init_int64()
-                        count = 1
-                        kk = kh_put_int64(table_distinct, v, &ret)
-                        previous_index = current_index
-
-                    out_buffer[current_index] = count
                 else:
                     raise NotImplementedError('sumtype not supported')
 
-    if agg_method == _SORTED_COUNT_DISTINCT:
-        kh_destroy_int64(table_distinct)
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
         np.delete(out_buffer, skip_key)
