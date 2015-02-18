@@ -8,6 +8,7 @@ import numpy as np
 import shutil
 import nose
 import numpy as np
+import math
 from numpy.testing import assert_array_equal
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
@@ -518,19 +519,14 @@ class TestCtable():
             [list(x) for x in result_bcolz], ref)
 
     def gen_dataset_count_with_NA_09(self, N):
-        pool = itertools.cycle(['a', 'a',
-                                'b', 'b', 'b',
-                                'c', 'c', 'c', 'c', 'c'])
-        pool_b = itertools.cycle([0.0, 0.1,
-                                  1.0, 1.0, 1.0,
-                                  3.0, 3.0, 3.0, 4.0, 3.0])
-        pool_c = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
-        pool_d = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
-        pool_e = itertools.cycle([0.0, 0.1,
-                                  0.1, 0.2, 0.2,
-                                  0.3, 0.3, 0.4, 0.4, 0.5])
-        pool_f = itertools.cycle([0,0,1,1,2,2,3,4,5,5])
-        pool_g = itertools.cycle([0,0,1,1,2,2,3,4,5,6])
+        pool = (random.choice(['a', 'b', 'c']) for _ in range(N))
+        pool_b = (random.choice([0.1, 0.2, 0.3]) for _ in range(N))
+        pool_c = (random.choice([0, 1, 2, 3]) for _ in range(N))
+        pool_d = (random.choice([0, 1, 2, 3]) for _ in range(N))
+
+        pool_e = (math.ceil(x) for x in np.arange(0, N / 10.0, 0.1))
+        pool_f = (math.ceil(x) for x in np.arange(0, N, 1))
+        pool_g = (math.ceil(x) for x in np.arange(0, N, 1))
         for _ in range(N):
             d = (
                 pool.next(),
@@ -544,7 +540,6 @@ class TestCtable():
             )
             yield d
 
-    @attr('dev')
     def test_groupby_09(self):
         """
         test_groupby_08: Groupby's type SORTED_COUNT_DISTINCT
@@ -554,7 +549,7 @@ class TestCtable():
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
         agg_list = ['f5', 'f6']
-        num_rows = 10  # do not change without adapting the genrator
+        num_rows = 1000
 
         # -- Data --
         g = self.gen_dataset_count_with_NA_09(num_rows)
