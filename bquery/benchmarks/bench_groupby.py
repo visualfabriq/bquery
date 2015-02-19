@@ -66,7 +66,6 @@ print('x{0} slower than pandas'.format(round(t_elapsed/t_pandas, 2)))
 print(result)
 
 # -- blaze + bcolz --
-# from IPython import embed; embed(); exit()
 blaze_data = blz.Data(ct.rootdir)
 expr = blz.by(blaze_data.f0, sum_f2=blaze_data.f2.sum())
 with ctime(message='blaze over bcolz'):
