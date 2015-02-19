@@ -522,8 +522,8 @@ class TestCtable():
         pool_c = (random.choice([0, 1, 2, 3]) for _ in range(N))
         pool_d = (random.choice([0, 1, 2, 3]) for _ in range(N))
 
-        pool_e = (math.ceil(x) for x in np.arange(0, N / 10.0, 0.1))
-        pool_f = (math.ceil(x) for x in np.arange(0, N, 1))
+        pool_e = (math.ceil(x) for x in np.arange(0, N * 0.1, 0.1))
+        pool_f = (math.ceil(x) for x in np.arange(0, N * 0.3, 0.3))
         pool_g = (math.ceil(x) for x in np.arange(0, N, 1))
         for _ in range(N):
             d = (
