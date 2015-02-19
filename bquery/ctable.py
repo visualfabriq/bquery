@@ -71,7 +71,6 @@ class ctable(bcolz.ctable):
         rootdir: the aggregation ctable rootdir
 
         """
-        print 'agg_method', agg_method
         map_agg_method = {
             'sum': SUM,
             'count': COUNT,
