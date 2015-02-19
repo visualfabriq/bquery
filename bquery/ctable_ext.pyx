@@ -121,6 +121,7 @@ def factorize_str(carray carray_, carray labels=None):
 
     return labels, reverse
 
+
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_int64_helper(Py_ssize_t iter_range,
@@ -140,6 +141,7 @@ cdef void _factorize_int64_helper(Py_ssize_t iter_range,
     ret = 0
 
     for i in range(iter_range):
+        # TODO: Consider indexing directly into the array for efficiency
         element = in_buffer[i]
         k = kh_get_int64(table, element)
         if k != table.n_buckets:
@@ -170,6 +172,7 @@ def factorize_int64(carray carray_, carray labels=None):
     chunklen = carray_.chunklen
     if labels is None:
         labels = carray([], dtype='int64', expectedlen=n)
+    # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
     in_buffer = np.empty(chunklen, dtype='int64')
     table = kh_init_int64()
@@ -226,6 +229,7 @@ cdef void _factorize_int32_helper(Py_ssize_t iter_range,
     ret = 0
 
     for i in range(iter_range):
+        # TODO: Consider indexing directly into the array for efficiency
         element = in_buffer[i]
         k = kh_get_int32(table, element)
         if k != table.n_buckets:
