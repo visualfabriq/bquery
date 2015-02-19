@@ -592,10 +592,11 @@ cdef count_unique_int32(ndarray[int32_t] values):
     return count
 
 
+
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_float64(carray ca_input, carray ca_factor,
-                 Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -610,7 +611,6 @@ cdef sum_float64(carray ca_input, carray ca_factor,
         npy_float64 v
         bint count_distinct_started = 0
         carray num_uniques
-
 
     count = 0
     ret = 0
@@ -674,9 +674,11 @@ cdef sum_float64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
+
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
+
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
                     if not count_distinct_started:
@@ -721,9 +723,11 @@ cdef sum_float64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
+
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
+
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
                     if not count_distinct_started:
@@ -826,8 +830,10 @@ cdef sum_int32(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
+
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
+
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
                     if not count_distinct_started:
@@ -872,8 +878,10 @@ cdef sum_int32(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
+
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
+
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
                     if not count_distinct_started:
@@ -976,8 +984,10 @@ cdef sum_int64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
+
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
+
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
                     if not count_distinct_started:
@@ -1022,8 +1032,10 @@ cdef sum_int64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
+
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
+
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
                     if not count_distinct_started:
@@ -1044,6 +1056,7 @@ cdef sum_int64(carray ca_input, carray ca_factor,
         np.delete(out_buffer, skip_key)
 
     return out_buffer
+
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
