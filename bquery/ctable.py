@@ -6,7 +6,8 @@ import numpy as np
 import bcolz
 from collections import namedtuple
 import os
-from bquery.ctable_ext import SUM
+from bquery.ctable_ext import \
+    SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
 
 class ctable(bcolz.ctable):
     def cache_factor(self, col_list, refresh=False):
@@ -48,7 +49,7 @@ class ctable(bcolz.ctable):
                 carray_values.flush()
 
     def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None,
-                agg_method=SUM):
+                agg_method='sum'):
         """
         Aggregate the ctable
 
@@ -70,6 +71,15 @@ class ctable(bcolz.ctable):
         rootdir: the aggregation ctable rootdir
 
         """
+        print 'agg_method', agg_method
+        map_agg_method = {
+            'sum': SUM,
+            'count': COUNT,
+            'count_na': COUNT_NA,
+            'count_distinct': COUNT_DISTINCT,
+            'sorted_count_distinct': SORTED_COUNT_DISTINCT,
+        }
+        _agg_method = map_agg_method[agg_method]
 
         if not agg_list:
             raise AttributeError('One or more aggregation operations '
@@ -88,7 +98,7 @@ class ctable(bcolz.ctable):
         ctable_ext.aggregate_groups_by_iter_2(self, ct_agg, nr_groups, skip_key,
                                               factor_carray, groupby_cols,
                                               agg_ops, dtype_list,
-                                              agg_method=agg_method)
+                                              agg_method=_agg_method)
 
         return ct_agg
 

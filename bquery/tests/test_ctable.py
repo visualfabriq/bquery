@@ -13,8 +13,6 @@ from numpy.testing import assert_array_equal
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
 import itertools as itt
-from bquery.ctable_ext import \
-    SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
 
 class TestCtable():
     def setup(self):
@@ -336,7 +334,7 @@ class TestCtable():
 
     def test_groupby_06(self):
         """
-        test_groupby_06: Groupby type COUNT
+        test_groupby_06: Groupby type 'count'
         """
         random.seed(1)
 
@@ -358,7 +356,7 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          agg_method=COUNT)
+                                          agg_method='count')
         print result_bcolz
 
         # Itertools result
@@ -384,7 +382,7 @@ class TestCtable():
 
     def test_groupby_07(self):
         """
-        test_groupby_07: Groupby type COUNT_NA
+        test_groupby_07: Groupby type 'count_na'
         """
         random.seed(1)
 
@@ -406,7 +404,7 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          agg_method=COUNT_NA)
+                                          agg_method='count_na')
         print result_bcolz
 
         # Itertools result
@@ -474,7 +472,7 @@ class TestCtable():
 
     def test_groupby_08(self):
         """
-        test_groupby_08: Groupby's type SORTED_COUNT_DISTINCT
+        test_groupby_08: Groupby's type 'sorted_count_distinct'
         """
         random.seed(1)
 
@@ -498,7 +496,7 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          agg_method=COUNT_DISTINCT)
+                                          agg_method='count_distinct')
         print result_bcolz
         #
         # # Itertools result
@@ -542,7 +540,7 @@ class TestCtable():
 
     def test_groupby_09(self):
         """
-        test_groupby_08: Groupby's type SORTED_COUNT_DISTINCT
+        test_groupby_08: Groupby's type 'sorted_count_distinct'
         """
         random.seed(1)
 
@@ -564,9 +562,8 @@ class TestCtable():
         fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
         fact_bcolz.flush()
 
-        fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          agg_method=SORTED_COUNT_DISTINCT)
+                                          agg_method='sorted_count_distinct')
         print result_bcolz
 
         # # Itertools result
