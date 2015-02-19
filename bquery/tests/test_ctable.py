@@ -546,7 +546,7 @@ class TestCtable():
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
-        agg_list = ['f5', 'f6']
+        agg_list = ['f4', 'f5', 'f6']
         num_rows = 1000
 
         # -- Data --
@@ -578,7 +578,7 @@ class TestCtable():
             f4 = len(self._get_unique([x[4] for x in result_itt['groups'][n]]))
             f5 = len(self._get_unique([x[5] for x in result_itt['groups'][n]]))
             f6 = len(self._get_unique([x[6] for x in result_itt['groups'][n]]))
-            ref.append([u, f5, f6])
+            ref.append([u, f4, f5, f6])
         print ref
 
         assert_list_equal(
