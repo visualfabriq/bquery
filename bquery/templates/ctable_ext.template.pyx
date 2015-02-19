@@ -305,35 +305,6 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
 
     return np_result, counts
 
-cdef count_unique_float64(ndarray[float64_t] values):
-    cdef:
-        Py_ssize_t i, n = len(values)
-        Py_ssize_t idx
-        int ret = 0
-        float64_t val
-        khiter_t k
-        npy_uint64 count = 0
-        bint seen_na = 0
-        kh_float64_t *table
-
-    table = kh_init_float64()
-
-    for i in range(n):
-        val = values[i]
-
-        if val == val:
-            k = kh_get_float64(table, val)
-            if k == table.n_buckets:
-                k = kh_put_float64(table, val, &ret)
-                count += 1
-        elif not seen_na:
-            seen_na = 1
-            count += 1
-
-    kh_destroy_float64(table)
-
-    return count
-
 {% for count_unique_type in count_unique_types %}
 cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] values):
     cdef:
@@ -343,6 +314,10 @@ cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] val
         {{ count_unique_type }}_t val
         khiter_t k
         npy_uint64 count = 0
+{% if count_unique_type == "float64" %}
+        bint seen_na = 0
+{% endif %}
+
         kh_{{ count_unique_type }}_t *table
 
     table = kh_init_{{ count_unique_type }}()
@@ -355,6 +330,11 @@ cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] val
             if k == table.n_buckets:
                 k = kh_put_{{ count_unique_type }}(table, val, &ret)
                 count += 1
+{% if count_unique_type == "float64" %}
+        elif not seen_na:
+            seen_na = 1
+            count += 1
+{% endif %}
 
     kh_destroy_{{ count_unique_type }}(table)
 
