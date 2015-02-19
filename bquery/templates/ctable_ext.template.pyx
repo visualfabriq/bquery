@@ -334,55 +334,32 @@ cdef count_unique_float64(ndarray[float64_t] values):
 
     return count
 
-cdef count_unique_int64(ndarray[int64_t] values):
+{% for count_unique_type in count_unique_types %}
+cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] values):
     cdef:
         Py_ssize_t i, n = len(values)
         Py_ssize_t idx
         int ret = 0
-        int64_t val
+        {{ count_unique_type }}_t val
         khiter_t k
         npy_uint64 count = 0
-        kh_int64_t *table
+        kh_{{ count_unique_type }}_t *table
 
-    table = kh_init_int64()
+    table = kh_init_{{ count_unique_type }}()
 
     for i in range(n):
         val = values[i]
 
         if val == val:
-            k = kh_get_int64(table, val)
+            k = kh_get_{{ count_unique_type }}(table, val)
             if k == table.n_buckets:
-                k = kh_put_int64(table, val, &ret)
+                k = kh_put_{{ count_unique_type }}(table, val, &ret)
                 count += 1
 
-    kh_destroy_int64(table)
+    kh_destroy_{{ count_unique_type }}(table)
 
     return count
-
-cdef count_unique_int32(ndarray[int32_t] values):
-    cdef:
-        Py_ssize_t i, n = len(values)
-        Py_ssize_t idx
-        int ret = 0
-        int32_t val
-        khiter_t k
-        npy_uint64 count = 0
-        kh_int32_t *table
-
-    table = kh_init_int32()
-
-    for i in range(n):
-        val = values[i]
-
-        if val == val:
-            k = kh_get_int32(table, val)
-            if k == table.n_buckets:
-                k = kh_put_int32(table, val, &ret)
-                count += 1
-
-    kh_destroy_int32(table)
-
-    return count
+{% endfor %}
 
 @cython.wraparound(False)
 @cython.boundscheck(False)

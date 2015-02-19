@@ -540,6 +540,7 @@ cdef count_unique_float64(ndarray[float64_t] values):
 
     return count
 
+
 cdef count_unique_int64(ndarray[int64_t] values):
     cdef:
         Py_ssize_t i, n = len(values)
@@ -589,6 +590,7 @@ cdef count_unique_int32(ndarray[int32_t] values):
     kh_destroy_int32(table)
 
     return count
+
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
