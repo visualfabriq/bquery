@@ -123,7 +123,7 @@ def factorize_str(carray carray_, carray labels=None):
 
     return labels, reverse
 
-{% for factor_type in factor_types %}
+{% for factor_type in factor_types -%}
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_{{ factor_type }}_helper(Py_ssize_t iter_range,
@@ -211,7 +211,8 @@ def factorize_{{ factor_type }}(carray carray_, carray labels=None):
     kh_destroy_{{ factor_type }}(table)
 
     return labels, reverse
-{% endfor %}
+
+{% endfor -%}
 
 def factorize(carray carray_, carray labels=None):
     if carray_.dtype == 'int32':
@@ -305,7 +306,7 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
 
     return np_result, counts
 
-{% for count_unique_type in count_unique_types %}
+{% for count_unique_type in count_unique_types -%}
 cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] values):
     cdef:
         Py_ssize_t i, n = len(values)
@@ -314,10 +315,9 @@ cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] val
         {{ count_unique_type }}_t val
         khiter_t k
         npy_uint64 count = 0
-{% if count_unique_type == "float64" %}
+{%- if count_unique_type == "float64" %}
         bint seen_na = 0
-{% endif %}
-
+{%- endif %}
         kh_{{ count_unique_type }}_t *table
 
     table = kh_init_{{ count_unique_type }}()
@@ -330,18 +330,19 @@ cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] val
             if k == table.n_buckets:
                 k = kh_put_{{ count_unique_type }}(table, val, &ret)
                 count += 1
-{% if count_unique_type == "float64" %}
+{%- if count_unique_type == "float64" %}
         elif not seen_na:
             seen_na = 1
             count += 1
-{% endif %}
+{%- endif %}
 
     kh_destroy_{{ count_unique_type }}(table)
 
     return count
-{% endfor %}
 
-{% for sum_type in sum_types %}
+{% endfor -%}
+
+{% for sum_type in sum_types -%}
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
@@ -427,10 +428,10 @@ cdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
-{% else %}
+{%- else %}
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
-{% endif %}
+{%- endif %}
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
                     if not count_distinct_started:
@@ -475,14 +476,14 @@ cdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
-{% if sum_type == "float64" %}
+{%- if sum_type == "float64" %}
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
-{% else %}
+{%- else %}
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
-{% endif %}
+{%- endif %}
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
                     if not count_distinct_started:
@@ -503,7 +504,8 @@ cdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
         np.delete(out_buffer, skip_key)
 
     return out_buffer
-{% endfor %}
+
+{% endfor -%}
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -663,3 +665,4 @@ cpdef carray_is_in(carray col, set value_set, ndarray boolarr, bint reverse):
             if val in value_set:
                 boolarr[i] = False
             i += 1
+
