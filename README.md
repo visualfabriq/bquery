@@ -1,7 +1,7 @@
 bquery
 ======
 
-A query and aggregation framework for Bcolz. 
+A query and aggregation framework for Bcolz.
 
 Bcolz is a light weight package that provides columnar, chunked data containers that can be compressed either in-memory and on-disk. that are compressed by default not only for reducing memory/disk storage, but also to improve I/O speed. It excels at storing and sequentially accessing large, numerical data sets.
 
@@ -12,7 +12,7 @@ It is important to notice that while the end result is a bcolz ctable (which can
 At the moment, only two aggregation methods are provided: sum and sum_na (which ignores nan values), but we aim to extend this to all normal operations in the future.
 Other planned improvements are further improving per-column parallel execution of a query and extending numexpr with in/not in functionality to further speed up advanced filtering.
 
-Though nascent, the technology itself is reliable and stable, if still limited in the depth of functionality. Visualfabriq uses bcolz and bquery to reliably handle billions of records for our clients with real-time reporting and machine learning usage. 
+Though nascent, the technology itself is reliable and stable, if still limited in the depth of functionality. Visualfabriq uses bcolz and bquery to reliably handle billions of records for our clients with real-time reporting and machine learning usage.
 
 Bquery requires bcolz. The user is also greatly encouraged to install numexpr.
 
@@ -27,7 +27,7 @@ Bquery subclasses the ctable from bcolz, meaning that all original ctable functi
     # assuming you have an example on-table bcolz file called example.bcolz
     ct = bquery.ctable(rootdir='example.bcolz')
 
-A groupby with aggregation is easy to perform: 
+A groupby with aggregation is easy to perform:
 
 ctable.groupby(list of groupby columns, agg_list)
 
@@ -40,10 +40,10 @@ Examples:
 
     # groupby column f0, perform a sum on column f2 and keep the output column with the same name
     ct.groupby(['f0'], ['f2'])
-    
+
     # groupby column f0, perform a sum on column f2 and rename the output column to f2_sum
     ct.groupby(['f0'], [['f2', 'f2_sum']])
-    
+
     # groupby column f0, with a sum on f2 ('f2_sum') and a sum_na on f2 ('f2_sum_na')
     ct.groupby(['f0'], [['f2', 'f2_sum', 'sum'], ['f2', 'f2_sum_na', 'sum_na']])
 
@@ -56,9 +56,12 @@ ctable.cache_factor(list of all possible groupby columns)
 
 If the table is changed, the factorization has to be re-performed. This is not triggered automatically yet.
 
-Building
---------
+Building & Installing
+---------------------
+
 To be able to build, the package bcolz with ```carray_ext.pxd``` at least version 0.8.0 is needed.
+
+Clone bcolz build it and install it (at the moment both steps needed)
 
 ```
 git clone https://github.com/blosc/bcolz.git
@@ -68,13 +71,10 @@ cd ..
 export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 ```
 
+Go back to your bquery directory and repeat build and install steps.
+
 ```
 python setup.py build_ext --inplace
-```
-
-Installing
-----------
-```
 python setup.py install
 ```
 
