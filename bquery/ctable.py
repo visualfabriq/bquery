@@ -48,9 +48,50 @@ class ctable(bcolz.ctable):
                                  rootdir=col_values_rootdir, mode='w')
                 carray_values.flush()
 
+    def unique(self, col_or_col_list):
+        """
+        Return a list of unique values of a column or a list of lists of column list
+
+        :param col_or_col_list: a column or a list of columns
+        :return:
+        """
+
+        if isinstance(col_or_col_list, list):
+            col_is_list = True
+            col_list = col_or_col_list
+        else:
+            col_is_list = False
+            col_list = [col_or_col_list]
+
+        output = []
+
+        for col in col_list:
+
+            if self.rootdir:
+                col_values_rootdir = self[col].rootdir + '.values'
+            else:
+                col_values_rootdir = None
+
+            if col_values_rootdir and os.path.exists(col_values_rootdir):
+                # retrieve values from existing disk-based factorization
+                carray_values = bcolz.carray(rootdir=col_values_rootdir)
+                values = list(carray_values)
+            else:
+                # factorize on-the-fly
+                _, values = ctable_ext.factorize(self[col])
+                values = values.values()
+
+            output.append(values)
+
+        if not col_is_list:
+            output = output[0]
+
+        return output
+
     def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None,
                 agg_method='sum'):
         """
+
         Aggregate the ctable
 
         groupby_cols: a list of columns to groupby over
@@ -71,6 +112,7 @@ class ctable(bcolz.ctable):
         rootdir: the aggregation ctable rootdir
 
         """
+        # TODO: change aggregation types to method as described in "a list with the type of aggregation for each column"
         map_agg_method = {
             'sum': SUM,
             'count': COUNT,
