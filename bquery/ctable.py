@@ -2,12 +2,18 @@
 import ctable_ext
 
 # external imports
+import multiprocessing as mp
 import numpy as np
 import bcolz
 from collections import namedtuple
 import os
 from bquery.ctable_ext import \
     SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
+
+def wrapper_factorize(carray_, labels=None):
+    labels, reverse = ctable_ext.factorize(carray_)
+    return reverse
+
 
 class ctable(bcolz.ctable):
     def cache_factor(self, col_list, refresh=False):
@@ -64,6 +70,7 @@ class ctable(bcolz.ctable):
             col_list = [col_or_col_list]
 
         output = []
+        pool = mp.Pool(mp.cpu_count())
 
         for col in col_list:
 
@@ -77,11 +84,14 @@ class ctable(bcolz.ctable):
                 carray_values = bcolz.carray(rootdir=col_values_rootdir)
                 values = list(carray_values)
             else:
-                # factorize on-the-fly
-                _, values = ctable_ext.factorize(self[col])
-                values = values.values()
+                # factorize on-the-fly ctable_ext
+                pool.apply_async(wrapper_factorize, [self[col]],
+                                 {'labels': None},
+                                 callback=output.append
+                )
 
-            output.append(values)
+        pool.close()
+        pool.join()
 
         if not col_is_list:
             output = output[0]
