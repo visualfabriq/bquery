@@ -9,7 +9,29 @@ import os
 from bquery.ctable_ext import \
     SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
 
+
 class ctable(bcolz.ctable):
+    def cache_valid(self, col):
+        """
+        Checks whether the column has a factorization that exists and is not older than the source
+
+        :param col:
+        :return:
+        """
+        if self.rootdir:
+            col_org_file_check = self[col].rootdir + '/__attrs__'
+            col_values_file_check = self[col].rootdir + '.values/__attrs__'
+
+            if not os.path.exists(col_org_file_check):
+                raise KeyError(str(col) + ' does not exist')
+
+            if os.path.exists(col_values_file_check):
+                return os.path.getctime(col_org_file_check) < os.path.getctime(col_values_file_check)
+            else:
+                return False
+        else:
+            return False
+
     def cache_factor(self, col_list, refresh=False):
         """
         Existing todos here are: these should be hidden helper carrays
@@ -31,18 +53,19 @@ class ctable(bcolz.ctable):
 
         for col in col_list:
 
-            col_rootdir = self[col].rootdir
-            col_factor_rootdir = col_rootdir + '.factor'
-            col_values_rootdir = col_rootdir + '.values'
-
             # create cache if needed
-            if refresh or not os.path.exists(col_factor_rootdir):
+            if refresh or not self.cache_valid(col):
+                col_rootdir = self[col].rootdir
+                col_factor_rootdir = col_rootdir + '.factor'
+                col_values_rootdir = col_rootdir + '.values'
+
                 carray_factor = \
                     bcolz.carray([], dtype='int64', expectedlen=self.size,
                                    rootdir=col_factor_rootdir, mode='w')
                 _, values = \
                     ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
+
                 carray_values = \
                     bcolz.carray(values.values(), dtype=self[col].dtype,
                                  rootdir=col_values_rootdir, mode='w')
@@ -67,14 +90,10 @@ class ctable(bcolz.ctable):
 
         for col in col_list:
 
-            if self.rootdir:
-                col_values_rootdir = self[col].rootdir + '.values'
-            else:
-                col_values_rootdir = None
-
-            if col_values_rootdir and os.path.exists(col_values_rootdir):
+            if self.cache_valid(col):
                 # retrieve values from existing disk-based factorization
-                carray_values = bcolz.carray(rootdir=col_values_rootdir)
+                col_values_rootdir = self[col].rootdir + '.values'
+                carray_values = bcolz.carray(rootdir=col_values_rootdir, mode='r')
                 values = list(carray_values)
             else:
                 # factorize on-the-fly
@@ -143,7 +162,6 @@ class ctable(bcolz.ctable):
 
         return ct_agg
 
-
     # groupby helper functions
     def factorize_groupby_cols(self, groupby_cols):
         """
@@ -158,19 +176,15 @@ class ctable(bcolz.ctable):
         # factorize the groupby columns
         for col in groupby_cols:
 
-            cached = False
-            col_rootdir = self[col].rootdir
-            if col_rootdir:
+            if self.cache_valid(col):
+                col_rootdir = self[col].rootdir
                 col_factor_rootdir = col_rootdir + '.factor'
                 col_values_rootdir = col_rootdir + '.values'
-                if os.path.exists(col_factor_rootdir):
-                    cached = True
-                    col_factor_carray = \
-                        bcolz.carray(rootdir=col_factor_rootdir, mode='r')
-                    col_values_carray = \
-                        bcolz.carray(rootdir=col_values_rootdir, mode='r')
-
-            if not cached:
+                col_factor_carray = \
+                    bcolz.carray(rootdir=col_factor_rootdir, mode='r')
+                col_values_carray = \
+                    bcolz.carray(rootdir=col_values_rootdir, mode='r')
+            else:
                 col_factor_carray, values = ctable_ext.factorize(self[col])
                 col_values_carray = \
                     bcolz.carray(values.values(), dtype=self[col].dtype)
@@ -180,7 +194,7 @@ class ctable(bcolz.ctable):
 
         return factor_list, values_list
 
-
+    @staticmethod
     def make_group_index(self, factor_list, values_list, groupby_cols,
                          array_length, bool_arr):
         # create unique groups for groupby loop
@@ -247,7 +261,6 @@ class ctable(bcolz.ctable):
 
         return factor_carray, nr_groups, skip_key
 
-
     def create_agg_ctable(self, groupby_cols, agg_list, nr_groups, rootdir):
         # create output table
         dtype_list = []
@@ -299,7 +312,6 @@ class ctable(bcolz.ctable):
             rootdir=rootdir)
 
         return ct_agg, dtype_list, agg_ops
-
 
     def where_terms(self, term_list):
         """
