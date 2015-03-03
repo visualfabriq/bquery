@@ -421,7 +421,7 @@ cpdef void translate_int64(carray input_, carray output_, dict lookup, npy_int64
 
     leftover_elements = cython.cdiv(input_.leftover, input_.atomsize)
     if leftover_elements > 0:
-        in_buffer = input_.leftover_array[i]
+        in_buffer = input_.leftover_array
         for i in range(leftover_elements):
             element = in_buffer[i]
             out_buffer[i] = lookup.get(element, default)
