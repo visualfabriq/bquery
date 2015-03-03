@@ -403,7 +403,7 @@ cpdef void translate_int64(carray input_, carray output_, dict lookup, npy_int64
         chunk chunk_
         Py_ssize_t i, chunklen, leftover_elements
         ndarray[npy_int64] in_buffer
-        ndarray[npy_uint64] out_buffer
+        ndarray[npy_int64] out_buffer
 
     chunklen = input_.chunklen
     out_buffer = np.empty(chunklen, dtype='int64')
