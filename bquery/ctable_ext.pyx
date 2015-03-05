@@ -398,7 +398,7 @@ cpdef factorize(carray carray_, carray labels=None):
 # Translate existing arrays
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cpdef void translate_int64(carray input_, carray output_, dict lookup, npy_int64 default=-1):
+cpdef translate_int64(carray input_, carray output_, dict lookup, npy_int64 default=-1):
     cdef:
         chunk chunk_
         Py_ssize_t i, chunklen, leftover_elements
