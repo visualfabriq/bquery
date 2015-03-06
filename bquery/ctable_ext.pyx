@@ -10,7 +10,7 @@ from libc.stdlib cimport malloc, calloc, free
 from libc.string cimport strcpy, memcpy, memset
 from libcpp.vector cimport vector
 from khash cimport *
-from bcolz.carray_ext cimport carray, chunk
+from bcolz.carray_ext cimport carray, chunks, chunk
 
 # ----------------------------------------------------------------------------
 #                        GLOBAL DEFINITIONS
@@ -101,16 +101,17 @@ cdef void _factorize_str_helper(Py_ssize_t iter_range,
 def factorize_str(carray carray_, carray labels=None):
     cdef:
         chunk chunk_
-        Py_ssize_t n, i, count, chunklen, leftover_elements, allocation_size, \
-                   nchunks
-        unsigned int j, num_threads, thread_id, test
+        chunks labels_chunks
+        Py_ssize_t n, i, j, count, chunklen, leftover_elements, \
+                   allocation_size, nchunks, chunklen_multiplier, \
+                   tmp_chunks_counter
+        unsigned int num_threads, thread_id
         omp_lock_t * kh_locks
         omp_lock_t chunk_lock, out_buffer_lock
         vector[char *] reverse_values
         dict reverse
         char * in_buffer_ptr
         ndarray[npy_uint64] out_buffer
-        ndarray[npy_uint64] tmp_labels
         char * out_buffer_org_ptr
         uint64_t * out_buffer_ptr
         kh_str_t *table
@@ -120,15 +121,34 @@ def factorize_str(carray carray_, carray labels=None):
     count = 0
     ret = 0
     reverse = {}
+    tmp_chunks_list = []
+    tmp_chunks_counter = 0
     nchunks = carray_.nchunks
-    # 0 = set the number of parallel threads automatically:
+    # num_threads = 0: set the number of parallel threads automatically:
     num_threads = 0
 
     n = len(carray_)
     chunklen = carray_.chunklen
     allocation_size = carray_.dtype.itemsize + 1
+
     if labels is None:
         labels = carray([], dtype='int64', expectedlen=n)
+        tmp_multiplier = round(labels.chunklen / carray_.chunklen)
+        if tmp_multiplier < 1:
+            tmp_multiplier = 1
+        tmp_multiplier = int(round(tmp_multiplier))
+        labels = carray([], dtype='int64', 
+                        chunklen=tmp_multiplier * carray_.chunklen)
+    if labels.chunklen % chunklen != 0:
+        raise NotImplementedError('labels.chunklen must be a multiple of ' +
+                                  'carray_.chunklen')
+    chunklen_multiplier = labels.chunklen / carray_.chunklen
+    # provide access to cython chunks api for persistent labels
+    # fails with in-memory carray
+    if labels._rootdir is not None:
+        labels_chunks = labels.chunks
+
+    tmp_chunks_keys = [0] * int(carray_.size / labels.chunklen)
 
     leftover_array_ptr = carray_.leftover_array.__array_interface__['data'][0]
 
@@ -143,6 +163,7 @@ def factorize_str(carray carray_, carray labels=None):
         # (&var)[0]: workaround to keep num_threads shared and available after
         #            with block
         (&num_threads)[0] = omp_get_num_threads()
+    num_threads *= 2
     kh_locks = <omp_lock_t *> malloc(num_threads * sizeof(omp_lock_t))
     for j in xrange(num_threads):
         omp_init_lock(&kh_locks[j])
@@ -156,15 +177,11 @@ def factorize_str(carray carray_, carray labels=None):
     #       Use PyArray_SimpleNewFromData instead!?
     # Ref: http://blog.enthought.com/python/numpy-arrays-with-pre-allocated-memory
     # Ref: https://gist.github.com/GaelVaroquaux/1249305
-    out_buffer = np.empty(chunklen, dtype='uint64')
+    out_buffer = np.empty(labels.chunklen, dtype='uint64')
     # we are going to redirect the data pointer, keep note of the original
     # to be able to restore it. Otherwise python will try to free an invalid 
     # pointer when it garbage collects the out_buffer object
     out_buffer_org_ptr = out_buffer.data
-
-    leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
-    # full size out-buffer (temporary fix for out of order chunk results)
-    tmp_labels = np.empty(chunklen*nchunks+leftover_elements, dtype='uint64')
 
     # code in the parallel(...) block runs "isolated" (to some extent) in
     # multiple child threads
@@ -178,36 +195,41 @@ def factorize_str(carray carray_, carray labels=None):
         # note 1: cannot use ndarrays like: in_buffer = np.empty(...)
         #         In spite of the assignment cython does not create a 
         #         thread local ndarray as it should! (Also see note 2 below.)
-        in_buffer_ptr = <char *>malloc(chunklen * (allocation_size-1) * sizeof(char))
-        out_buffer_ptr = <uint64_t *>malloc(chunklen * (allocation_size-1) * sizeof(uint64_t))
+        in_buffer_ptr = <char *>malloc(chunklen * (allocation_size-1) * 
+                                       sizeof(char))
+        out_buffer_ptr = <uint64_t *>malloc(chunklen_multiplier * chunklen * 
+                                            sizeof(uint64_t))
 
         # This is the work-sharing loop. The body is executed in multiple
         # threads with each thread receiving a different value for i.
-        for i in prange(nchunks):
+        for i in prange(0, nchunks, chunklen_multiplier):
             thread_id = threadid()
-            # chunk._getitem is not thread-safe. This may be due to it
-            # setting properties of chunk using self. - Or not.
-            # TODO: check whether _getitem can be made thread-safe to 
-            #       get rid of this probably unnecessary thread lock
-            omp_set_lock(&chunk_lock)
-            with gil:
-                chunk_ = carray_.chunks[i]
-                # decompress into in_buffer
-                # note: _getitem releases gil during blosc decompression
-                chunk_._getitem(0, chunklen, in_buffer_ptr)
-            omp_unset_lock(&chunk_lock)
+            # pack the results from multiple carray_-chunks into one 
+            # labels-chunk: allows out-of-order writing of labels at good speed
+            for j in xrange(chunklen_multiplier):
+                # chunk._getitem is not thread-safe. This may be due to it
+                # setting properties of chunk using self. - Or not.
+                # TODO: check whether _getitem can be made thread-safe to 
+                #       get rid of this probably unnecessary thread lock
+                omp_set_lock(&chunk_lock)
+                with gil:
+                    chunk_ = carray_.chunks[i+j]
+                    # decompress into in_buffer
+                    # note: _getitem releases gil during blosc decompression
+                    chunk_._getitem(0, chunklen, in_buffer_ptr)
+                omp_unset_lock(&chunk_lock)
 
-            _factorize_str_helper(chunklen,
-                            allocation_size,
-                            in_buffer_ptr,
-                            out_buffer_ptr,
-                            table,
-                            &count,
-                            reverse_values,
-                            thread_id,
-                            kh_locks,
-                            num_threads,
-                            )
+                _factorize_str_helper(chunklen,
+                                allocation_size,
+                                in_buffer_ptr,
+                                out_buffer_ptr + j * chunklen,
+                                table,
+                                &count,
+                                reverse_values,
+                                thread_id,
+                                kh_locks,
+                                num_threads,
+                                )
 
             # note 2: labels.append(...) requires ndarray, but no thread-local 
             #         ndarrays can be created. Use the shared out_buffer 
@@ -217,27 +239,64 @@ def factorize_str(carray carray_, carray labels=None):
             with gil:
                 out_buffer.data = <char *>out_buffer_ptr
                 # compress out_buffer into labels
-                # note: append(...) can freeze with bcolz=0.8.0
-                #labels.append(out_buffer.astype(np.int64))
+                # _save() and append() freeze at versions prior to v0.8.1
+                if labels._rootdir is not None:
+                    labels_chunks._save(int(i/chunklen_multiplier), chunk(out_buffer, labels._dtype, 
+                                                 labels._cparams, _memory=False))
+                    labels._cbytes += chunk_.cbytes
+                    labels._nbytes += labels.chunklen * labels.itemsize
+                    labels_chunks.nchunks += 1
+                # in-memory chunks cannot be "_save()"-ed but must be appended
+                # to a python chunk list
+                else:
+                    # TODO: Why does the following not work? (Freezes...)
+                    # tmp_chunks_list[i] = chunk(out_buffer, labels._dtype, labels._cparams, _memory=True)
+                    #
+                    # Work-around until above problem is solved.
+                    tmp_chunks_list.append(chunk(out_buffer, labels._dtype, 
+                                                 labels._cparams, _memory=True))
+                    tmp_chunks_keys[int(i/chunklen_multiplier)] = tmp_chunks_counter
+                    (&tmp_chunks_counter)[0] += 1
 
-                # chunk results arrive out of order!
-                # Solutions: Either keep full-size shared out_buffer in memory 
-                # or find a way to write carray chunks out of order.
-                # Latter would be preferable.
-                # For now keeping thread-local out-buffers + full-size out-buffer
-                # in memory
-                tmp_labels[i*chunklen:(i+1)*chunklen] = out_buffer.astype(np.int64)
             omp_unset_lock(&out_buffer_lock)
 
         # Clean-up thread local variables
         free(in_buffer_ptr)
         free(out_buffer_ptr)
 
+    # update chunk count (necessary due to use of _save() above
+    if labels._rootdir is None:
+        labels.chunks = [tmp_chunks_list[i] for i in tmp_chunks_keys]
+
+    # process remaining chunks that could not be processed en-bloc, chunks in-order
+    # TODO: parallelise after refactoring
+    # This is really slowing us down when chunk_multiplier = 1 !!!
+    # e.g. uncompressed unique()
+    in_buffer_ptr = <char *>malloc(chunklen * (allocation_size-1) * sizeof(char))
+    out_buffer_ptr = <uint64_t *>malloc(chunklen * sizeof(uint64_t))
+    for i in xrange(labels.size/carray_.chunklen, nchunks):
+        chunk_ = carray_.chunks[i]
+        chunk_._getitem(0, chunklen, in_buffer_ptr)
+        _factorize_str_helper(chunklen,
+                        allocation_size,
+                        in_buffer_ptr,
+                        out_buffer_ptr,
+                        table,
+                        &count,
+                        reverse_values,
+                        0,
+                        kh_locks,
+                        num_threads,
+                        )
+        #out_buffer.data = <char *>out_buffer_ptr
+        #labels.append(out_buffer.astype(np.int64))
+
+
     # processing of leftover_array is not parallelised in view of an upcoming
     # changes to bcolz chunk access which will allow seamlessly folding 
     # this into the prange block 
+    leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
-        out_buffer_ptr = <uint64_t *>malloc(chunklen * (allocation_size-1) * sizeof(uint64_t))
         _factorize_str_helper(leftover_elements,
                             allocation_size,
                             <char *>leftover_array_ptr,
@@ -251,8 +310,11 @@ def factorize_str(carray carray_, carray labels=None):
                             )
         out_buffer.data = <char *>out_buffer_ptr
         # compress out_buffer into labels
-        #labels.append(out_buffer[:leftover_elements].astype(np.int64))
-        tmp_labels[nchunks*chunklen:nchunks*chunklen+leftover_elements+1] = out_buffer[:leftover_elements].astype(np.int64)
+        labels.append(out_buffer[:leftover_elements].astype(np.int64))
+
+    
+    free(in_buffer_ptr)
+    free(out_buffer_ptr)
 
     # destroy and free all locks
     for j in xrange(num_threads):
@@ -266,9 +328,6 @@ def factorize_str(carray carray_, carray labels=None):
     out_buffer.data = out_buffer_org_ptr
 
     kh_destroy_str(table)
-
-    # compress tmp_labels into carray
-    labels.append(tmp_labels)
 
     # construct python dict from vectors and
     # free the memory allocated for the strings in the reverse_values list

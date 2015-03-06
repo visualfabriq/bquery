@@ -62,6 +62,19 @@ class ctable(bcolz.ctable):
                 carray_factor = \
                     bcolz.carray([], dtype='int64', expectedlen=self.size,
                                    rootdir=col_factor_rootdir, mode='w')
+                # ensure carray_factor.chunklen is multiple of column chunklen
+                if carray_factor.chunklen % self[col].chunklen != 0:
+                    chunklen_multiplier = round(carray_factor.chunklen / 
+                                                self[col].chunklen)
+                    if chunklen_multiplier < 1.0:
+                        chunklen_multiplier = 1
+                    chunklen_multiplier = int(round(chunklen_multiplier))
+                    carray_factor = \
+                        bcolz.carray([], dtype='int64', 
+                                     chunklen=chunklen_multiplier * \
+                                              self[col].chunklen,
+                                     rootdir=col_factor_rootdir, mode='w')
+
                 _, values = \
                     ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
