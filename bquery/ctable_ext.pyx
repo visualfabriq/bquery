@@ -110,6 +110,7 @@ def factorize_str(carray carray_, carray labels=None):
         dict reverse
         char * in_buffer_ptr
         ndarray[npy_uint64] out_buffer
+        ndarray[npy_uint64] tmp_labels
         char * out_buffer_org_ptr
         uint64_t * out_buffer_ptr
         kh_str_t *table
@@ -160,6 +161,10 @@ def factorize_str(carray carray_, carray labels=None):
     # to be able to restore it. Otherwise python will try to free an invalid 
     # pointer when it garbage collects the out_buffer object
     out_buffer_org_ptr = out_buffer.data
+
+    leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
+    # full size out-buffer (temporary fix for out of order chunk results)
+    tmp_labels = np.empty(chunklen*nchunks+leftover_elements, dtype='uint64')
 
     # code in the parallel(...) block runs "isolated" (to some extent) in
     # multiple child threads
@@ -213,7 +218,15 @@ def factorize_str(carray carray_, carray labels=None):
                 out_buffer.data = <char *>out_buffer_ptr
                 # compress out_buffer into labels
                 # note: append(...) can freeze with bcolz=0.8.0
-                labels.append(out_buffer.astype(np.int64))
+                #labels.append(out_buffer.astype(np.int64))
+
+                # chunk results arrive out of order!
+                # Solutions: Either keep full-size shared out_buffer in memory 
+                # or find a way to write carray chunks out of order.
+                # Latter would be preferable.
+                # For now keeping thread-local out-buffers + full-size out-buffer
+                # in memory
+                tmp_labels[i*chunklen:(i+1)*chunklen] = out_buffer.astype(np.int64)
             omp_unset_lock(&out_buffer_lock)
 
         # Clean-up thread local variables
@@ -223,7 +236,6 @@ def factorize_str(carray carray_, carray labels=None):
     # processing of leftover_array is not parallelised in view of an upcoming
     # changes to bcolz chunk access which will allow seamlessly folding 
     # this into the prange block 
-    leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
         out_buffer_ptr = <uint64_t *>malloc(chunklen * (allocation_size-1) * sizeof(uint64_t))
         _factorize_str_helper(leftover_elements,
@@ -239,7 +251,8 @@ def factorize_str(carray carray_, carray labels=None):
                             )
         out_buffer.data = <char *>out_buffer_ptr
         # compress out_buffer into labels
-        labels.append(out_buffer[:leftover_elements].astype(np.int64))
+        #labels.append(out_buffer[:leftover_elements].astype(np.int64))
+        tmp_labels[nchunks*chunklen:nchunks*chunklen+leftover_elements+1] = out_buffer[:leftover_elements].astype(np.int64)
 
     # destroy and free all locks
     for j in xrange(num_threads):
@@ -253,6 +266,9 @@ def factorize_str(carray carray_, carray labels=None):
     out_buffer.data = out_buffer_org_ptr
 
     kh_destroy_str(table)
+
+    # compress tmp_labels into carray
+    labels.append(tmp_labels)
 
     # construct python dict from vectors and
     # free the memory allocated for the strings in the reverse_values list
