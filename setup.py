@@ -103,6 +103,10 @@ LFLAGS = os.environ.get('LFLAGS', '').split()
 # Allow setting the Blosc dir if installed in the system
 BLOSC_DIR = os.environ.get('BLOSC_DIR', '')
 
+# OpenMP libraries
+CFLAGS.append('-fopenmp')
+LFLAGS.append('-fopenmp')
+
 # Sources & libraries
 inc_dirs = ['bquery']
 lib_dirs = []
@@ -137,7 +141,8 @@ setup(name="bquery",
                     library_dirs=lib_dirs,
                     libraries=libs,
                     extra_link_args=LFLAGS,
-                    extra_compile_args=CFLAGS),
+                    extra_compile_args=CFLAGS,
+                    language='c++'),
       ],
       packages=['bquery', 'bquery.tests'],
 )

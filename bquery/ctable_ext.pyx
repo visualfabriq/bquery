@@ -1,8 +1,14 @@
-import numpy as np
 import cython
-from numpy cimport ndarray, dtype, npy_intp, npy_int32, npy_uint64, npy_int64, npy_float64
-from libc.stdlib cimport malloc
-from libc.string cimport strcpy
+from cython.parallel import parallel, prange, threadid
+from openmp cimport omp_lock_t, omp_init_lock, omp_set_lock, omp_unset_lock, omp_destroy_lock, omp_get_num_threads
+
+import numpy as np
+from numpy cimport ndarray, dtype, npy_intp, npy_uint8, npy_int32, npy_uint64, npy_int64, npy_float64, uint64_t
+
+from libc.stdint cimport uintptr_t
+from libc.stdlib cimport malloc, calloc, free
+from libc.string cimport strcpy, memcpy, memset
+from libcpp.vector cimport vector
 from khash cimport *
 from bcolz.carray_ext cimport carray, chunk
 
@@ -31,93 +37,228 @@ DEF _SORTED_COUNT_DISTINCT = 4
 @cython.boundscheck(False)
 cdef void _factorize_str_helper(Py_ssize_t iter_range,
                        Py_ssize_t allocation_size,
-                       ndarray in_buffer,
-                       ndarray[npy_uint64] out_buffer,
+                       char * in_buffer_ptr,
+                       uint64_t * out_buffer,
                        kh_str_t *table,
                        Py_ssize_t * count,
-                       dict reverse,
-                       ):
+                       vector[char *] & reverse_values,
+                       unsigned int thread_id,
+                       omp_lock_t kh_locks[],
+                       unsigned int num_threads,
+                       ) nogil:
     cdef:
-        Py_ssize_t i, idx
+        Py_ssize_t i, idx, itemsize
         int ret
+        unsigned int j
         char * element
         char * insert
         khiter_t k
 
     ret = 0
+    itemsize = allocation_size - 1
+    # allocate enough memory to hold the string element, add one for the
+    # null byte that marks the end of the string.
+    # TODO: understand why zero-filling is necessary. Without zero-filling
+    # the buffer, duplicate keys occur in the reverse dict
+    element = <char *>calloc(allocation_size, sizeof(char))
 
-    for i in range(iter_range):
-        # TODO: Consider indexing directly into the array for efficiency
-        element = in_buffer[i]
+    omp_set_lock(&kh_locks[thread_id])
+    for i in xrange(iter_range):
+        # strings are stored without null termination in ndarrays: need a 
+        # buffer to append null termination to use usual string algorithms
+        memcpy(element, in_buffer_ptr, itemsize)
+        in_buffer_ptr += itemsize
+
+        # while reading from shared hash table, set lock for this thread
         k = kh_get_str(table, element)
         if k != table.n_buckets:
             idx = table.vals[k]
         else:
+            omp_unset_lock(&kh_locks[thread_id])
             # allocate enough memory to hold the string, add one for the
             # null byte that marks the end of the string.
             insert = <char *>malloc(allocation_size)
             # TODO: is strcpy really the best way to copy a string?
             strcpy(insert, element)
+            # acquire locks for all threads before writing to shared resources
+            for j in xrange(num_threads):
+                omp_set_lock(&kh_locks[j])
             k = kh_put_str(table, insert, &ret)
             table.vals[k] = idx = count[0]
-            reverse[count[0]] = element
+            reverse_values.push_back(insert)
             count[0] += 1
+            # release all locks
+            for j in xrange(num_threads):
+                omp_unset_lock(&kh_locks[j])
+            omp_set_lock(&kh_locks[thread_id])
         out_buffer[i] = idx
+
+    omp_unset_lock(&kh_locks[thread_id])
+    free(element)
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
 def factorize_str(carray carray_, carray labels=None):
     cdef:
         chunk chunk_
-        Py_ssize_t n, i, count, chunklen, leftover_elements
+        Py_ssize_t n, i, count, chunklen, leftover_elements, allocation_size, \
+                   nchunks
+        unsigned int j, num_threads, thread_id, test
+        omp_lock_t * kh_locks
+        omp_lock_t chunk_lock, out_buffer_lock
+        vector[char *] reverse_values
         dict reverse
-        ndarray in_buffer
+        char * in_buffer_ptr
         ndarray[npy_uint64] out_buffer
+        char * out_buffer_org_ptr
+        uint64_t * out_buffer_ptr
         kh_str_t *table
+        uintptr_t leftover_array_ptr
+
 
     count = 0
     ret = 0
     reverse = {}
+    nchunks = carray_.nchunks
+    # 0 = set the number of parallel threads automatically:
+    num_threads = 0
 
     n = len(carray_)
     chunklen = carray_.chunklen
+    allocation_size = carray_.dtype.itemsize + 1
     if labels is None:
         labels = carray([], dtype='int64', expectedlen=n)
-    # in-buffer isn't typed, because cython doesn't support string arrays (?)
-    out_buffer = np.empty(chunklen, dtype='uint64')
-    in_buffer = np.empty(chunklen, dtype=carray_.dtype)
+
+    leftover_array_ptr = carray_.leftover_array.__array_interface__['data'][0]
+
     table = kh_init_str()
 
-    for i in range(carray_.nchunks):
-        chunk_ = carray_.chunks[i]
-        # decompress into in_buffer
-        chunk_._getitem(0, chunklen, in_buffer.data)
-        _factorize_str_helper(chunklen,
-                        carray_.dtype.itemsize + 1,
-                        in_buffer,
-                        out_buffer,
-                        table,
-                        &count,
-                        reverse,
-                        )
-        # compress out_buffer into labels
-        labels.append(out_buffer.astype(np.int64))
 
+    # Allocate and initialise shared locks for hash-table writes for each child
+    # thread. (Shared because locks is assigned outside the parallel() block)
+    # num_threads=0: cython chooses no of parallel threads (= cpu cores?)
+    with nogil, parallel(num_threads=num_threads):
+        # determine the number of parallel threads that will be created
+        # (&var)[0]: workaround to keep num_threads shared and available after
+        #            with block
+        (&num_threads)[0] = omp_get_num_threads()
+    kh_locks = <omp_lock_t *> malloc(num_threads * sizeof(omp_lock_t))
+    for j in xrange(num_threads):
+        omp_init_lock(&kh_locks[j])
+
+    # initialise locks for other shared resources
+    omp_init_lock(&chunk_lock)
+    omp_init_lock(&out_buffer_lock)
+
+    # create an out_buffer ndarray object to interface with chunk.append()
+    # TODO: Avoid np.empty as it unnecessarily allocates space for the content.
+    #       Use PyArray_SimpleNewFromData instead!?
+    # Ref: http://blog.enthought.com/python/numpy-arrays-with-pre-allocated-memory
+    # Ref: https://gist.github.com/GaelVaroquaux/1249305
+    out_buffer = np.empty(chunklen, dtype='uint64')
+    # we are going to redirect the data pointer, keep note of the original
+    # to be able to restore it. Otherwise python will try to free an invalid 
+    # pointer when it garbage collects the out_buffer object
+    out_buffer_org_ptr = out_buffer.data
+
+    # code in the parallel(...) block runs "isolated" (to some extent) in
+    # multiple child threads
+    # assignments within this block make variables thread-local, 
+    # e.g. in_buffer_ptr. BUT this does not seem to work with 'cdef class'
+    # defined objects, e.g. numpy.ndarray, bcolz.chunk, etc., and dereferencing.
+    # The latter is a useful work-around to modifying shared variables from
+    # within parallel the block if locking is handled manually.
+    with nogil, parallel(num_threads=num_threads):
+        # allocate an in-buffer and an out-buffer for each thread
+        # note 1: cannot use ndarrays like: in_buffer = np.empty(...)
+        #         In spite of the assignment cython does not create a 
+        #         thread local ndarray as it should! (Also see note 2 below.)
+        in_buffer_ptr = <char *>malloc(chunklen * (allocation_size-1) * sizeof(char))
+        out_buffer_ptr = <uint64_t *>malloc(chunklen * (allocation_size-1) * sizeof(uint64_t))
+
+        # This is the work-sharing loop. The body is executed in multiple
+        # threads with each thread receiving a different value for i.
+        for i in prange(nchunks):
+            thread_id = threadid()
+            # chunk._getitem is not thread-safe. This may be due to it
+            # setting properties of chunk using self. - Or not.
+            # TODO: check whether _getitem can be made thread-safe to 
+            #       get rid of this probably unnecessary thread lock
+            omp_set_lock(&chunk_lock)
+            with gil:
+                chunk_ = carray_.chunks[i]
+                # decompress into in_buffer
+                # note: _getitem releases gil during blosc decompression
+                chunk_._getitem(0, chunklen, in_buffer_ptr)
+            omp_unset_lock(&chunk_lock)
+
+            _factorize_str_helper(chunklen,
+                            allocation_size,
+                            in_buffer_ptr,
+                            out_buffer_ptr,
+                            table,
+                            &count,
+                            reverse_values,
+                            thread_id,
+                            kh_locks,
+                            num_threads,
+                            )
+
+            # note 2: labels.append(...) requires ndarray, but no thread-local 
+            #         ndarrays can be created. Use the shared out_buffer 
+            # ndarray object and redirect its data pointer to the thread-local
+            # c array out_buffer_ptr
+            omp_set_lock(&out_buffer_lock)
+            with gil:
+                out_buffer.data = <char *>out_buffer_ptr
+                # compress out_buffer into labels
+                # note: append(...) can freeze with bcolz=0.8.0
+                labels.append(out_buffer.astype(np.int64))
+            omp_unset_lock(&out_buffer_lock)
+
+        # Clean-up thread local variables
+        free(in_buffer_ptr)
+        free(out_buffer_ptr)
+
+    # processing of leftover_array is not parallelised in view of an upcoming
+    # changes to bcolz chunk access which will allow seamlessly folding 
+    # this into the prange block 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
+        out_buffer_ptr = <uint64_t *>malloc(chunklen * (allocation_size-1) * sizeof(uint64_t))
         _factorize_str_helper(leftover_elements,
-                          carray_.dtype.itemsize + 1,
-                          carray_.leftover_array,
-                          out_buffer,
-                          table,
-                          &count,
-                          reverse,
-                          )
+                            allocation_size,
+                            <char *>leftover_array_ptr,
+                            out_buffer_ptr,
+                            table,
+                            &count,
+                            reverse_values,
+                            0,
+                            kh_locks,
+                            num_threads,
+                            )
+        out_buffer.data = <char *>out_buffer_ptr
+        # compress out_buffer into labels
+        labels.append(out_buffer[:leftover_elements].astype(np.int64))
 
-    # compress out_buffer into labels
-    labels.append(out_buffer[:leftover_elements].astype(np.int64))
+    # destroy and free all locks
+    for j in xrange(num_threads):
+        omp_destroy_lock(&kh_locks[j])
+    free(kh_locks)
+    omp_destroy_lock(&chunk_lock)
+    omp_destroy_lock(&out_buffer_lock)
+
+    # restore out_buffer data pointer to avoid segfault when python thries
+    # to free the object's data
+    out_buffer.data = out_buffer_org_ptr
 
     kh_destroy_str(table)
+
+    # construct python dict from vectors and
+    # free the memory allocated for the strings in the reverse_values list
+    for i in xrange(reverse_values.size()):
+        reverse[i] = reverse_values[i]
+        free(reverse_values[i])
 
     return labels, reverse
 

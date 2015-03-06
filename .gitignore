@@ -54,7 +54,10 @@ docs/_build/
 target/
 
 # other
+*.pyx.orig
+cython_debug/
 bquery/ctable_ext.c
+bquery/ctable_ext.cpp
 bcolz
 bquery/benchmarks/vb_suite/benchmarks.db
 bquery/benchmarks/vb_suite/source
