@@ -36,7 +36,6 @@ cdef void _factorize_str_helper(Py_ssize_t iter_range,
                        uint64_t[:] out_buffer,
                        kh_str_t *table,
                        Py_ssize_t * count,
-                       vector[Py_ssize_t] & reverse_keys,
                        vector[char *] & reverse_values,
                        ) nogil:
     cdef:
@@ -68,7 +67,6 @@ cdef void _factorize_str_helper(Py_ssize_t iter_range,
             strcpy(insert, element)
             k = kh_put_str(table, insert, &ret)
             table.vals[k] = idx = count[0]
-            reverse_keys.push_back(count[0])
             reverse_values.push_back(insert)
             count[0] += 1
         out_buffer[i] = idx
@@ -82,7 +80,6 @@ def factorize_str(carray carray_, carray labels=None):
         chunk chunk_
         Py_ssize_t n, i, count, chunklen, leftover_elements, allocation_size, \
                    nchunks
-        vector[Py_ssize_t] reverse_keys
         vector[char *] reverse_values
         dict reverse
         ndarray in_buffer
@@ -126,7 +123,6 @@ def factorize_str(carray carray_, carray labels=None):
                             out_buffer_view,
                             table,
                             &count,
-                            reverse_keys,
                             reverse_values,
                             )
             with gil:
@@ -145,7 +141,6 @@ def factorize_str(carray carray_, carray labels=None):
                                 out_buffer_view,
                                 table,
                                 &count,
-                                reverse_keys,
                                 reverse_values,
                                 )
 
@@ -154,10 +149,10 @@ def factorize_str(carray carray_, carray labels=None):
 
     kh_destroy_str(table)
 
-    # construct python dict from vectors
-    reverse = dict(zip(reverse_keys, reverse_values))
+    # construct python dict from vectors and
     # free the memory allocated for the strings in the reverse_values list
     for i in range(reverse_values.size()):
+        reverse[i] = reverse_values[i]
         free(reverse_values[i])
 
     return labels, reverse
