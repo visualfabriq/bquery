@@ -266,7 +266,10 @@ def factorize_str(carray carray_, carray labels=None):
 
     # update chunk count (necessary due to use of _save() above
     if labels._rootdir is None:
-        labels.chunks = [tmp_chunks_list[i] for i in tmp_chunks_keys]
+        for i in xrange(tmp_chunks_counter):
+            labels.chunks.append(tmp_chunks_list[tmp_chunks_keys[i]])
+            labels._cbytes += tmp_chunks_list[tmp_chunks_keys[i]].cbytes
+            labels._nbytes += labels.chunklen * labels.itemsize
 
     # process remaining chunks that could not be processed en-bloc, chunks in-order
     # TODO: parallelise after refactoring
@@ -274,6 +277,7 @@ def factorize_str(carray carray_, carray labels=None):
     # e.g. uncompressed unique()
     in_buffer_ptr = <char *>malloc(chunklen * (allocation_size-1) * sizeof(char))
     out_buffer_ptr = <uint64_t *>malloc(chunklen * sizeof(uint64_t))
+    out_buffer.data = <char *>out_buffer_ptr
     for i in xrange(labels.size/carray_.chunklen, nchunks):
         chunk_ = carray_.chunks[i]
         chunk_._getitem(0, chunklen, in_buffer_ptr)
@@ -289,7 +293,7 @@ def factorize_str(carray carray_, carray labels=None):
                         num_threads,
                         )
         #out_buffer.data = <char *>out_buffer_ptr
-        #labels.append(out_buffer.astype(np.int64))
+        labels.append(out_buffer[:chunklen].astype(np.int64))
 
 
     # processing of leftover_array is not parallelised in view of an upcoming
@@ -308,7 +312,6 @@ def factorize_str(carray carray_, carray labels=None):
                             kh_locks,
                             num_threads,
                             )
-        out_buffer.data = <char *>out_buffer_ptr
         # compress out_buffer into labels
         labels.append(out_buffer[:leftover_elements].astype(np.int64))
 
