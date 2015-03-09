@@ -194,7 +194,6 @@ class ctable(bcolz.ctable):
 
         return factor_list, values_list
 
-    @staticmethod
     def make_group_index(self, factor_list, values_list, groupby_cols,
                          array_length, bool_arr):
         # create unique groups for groupby loop
