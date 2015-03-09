@@ -58,3 +58,6 @@ bquery/ctable_ext.c
 bcolz
 bquery/benchmarks/vb_suite/benchmarks.db
 bquery/benchmarks/vb_suite/source
+
+# Pycharm
+.idea
