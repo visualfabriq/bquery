@@ -383,7 +383,7 @@ def agg_sum(iter_):
 @cython.wraparound(False)
 def groupsort_indexer(carray index, Py_ssize_t ngroups):
     cdef:
-        Py_ssize_t i, label, n
+        Py_ssize_t i, label, n, len_in_buffer
         ndarray[int64_t] counts, where, np_result
         # --
         carray c_result
@@ -400,22 +400,10 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
     counts = np.zeros(ngroups + 1, dtype=np.int64)
     n = len(index)
 
-    for index_chunk_nr in range(index.nchunks):
-        # fill input buffer
-        input_chunk = index.chunks[index_chunk_nr]
-        input_chunk._getitem(0, index_chunk_len, in_buffer.data)
-
+    for in_buffer in bz.iterblocks(index):
+        len_in_buffer = len(in_buffer)
         # loop through rows
-        for i in range(index_chunk_len):
-            counts[index[i] + 1] += 1
-
-    leftover_elements = cython.cdiv(index.leftover, index.atomsize)
-    if leftover_elements > 0:
-        # fill input buffer
-        in_buffer = index.leftover_array
-
-        # loop through rows
-        for i in range(leftover_elements):
+        for i in range(len_in_buffer):
             counts[index[i] + 1] += 1
 
     # mark the start of each contiguous group of like-indexed data
