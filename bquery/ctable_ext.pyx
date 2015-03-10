@@ -777,9 +777,8 @@ cpdef sum_int64(carray ca_input, carray ca_factor,
 @cython.boundscheck(False)
 cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
     cdef:
-        chunk factor_chunk
-        Py_ssize_t in_buffer_len
-        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
+        Py_ssize_t in_buffer_len, factor_buffer_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_row
         Py_ssize_t current_index, i, factor_total_chunks
 
         ndarray in_buffer
@@ -789,16 +788,13 @@ cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_
     count = 0
     ret = 0
     reverse = {}
+    iter_ca_factor = bz.iterblocks(ca_factor)
 
-    factor_chunk_len = ca_factor.chunklen
+
     factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
-    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
-    if factor_total_chunks > 0:
-        factor_chunk = ca_factor.chunks[factor_chunk_nr]
-        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-    else:
-        factor_buffer = ca_factor.leftover_array
+    factor_buffer = iter_ca_factor.next()
+    factor_buffer_len = len(factor_buffer)
     factor_chunk_row = 0
     out_buffer = np.zeros(nr_groups, dtype=ca_input.dtype)
 
@@ -808,13 +804,9 @@ cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_
         for i in range(in_buffer_len):
 
             # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
+            if factor_chunk_row == factor_buffer_len:
                 factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
+                factor_buffer = iter_ca_factor.next()
                 factor_chunk_row = 0
 
             # retrieve index
