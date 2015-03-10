@@ -325,8 +325,8 @@ cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] val
 cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
-        chunk input_chunk, factor_chunk
-        Py_ssize_t input_chunk_nr, input_chunk_len
+        chunk factor_chunk
+        Py_ssize_t in_buffer_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
         Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
 
@@ -358,8 +358,6 @@ cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
 
         return num_uniques
 
-    input_chunk_len = ca_input.chunklen
-    in_buffer = np.empty(input_chunk_len, dtype='{{ sum_type }}')
     factor_chunk_len = ca_factor.chunklen
     factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
@@ -372,13 +370,11 @@ cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
     factor_chunk_row = 0
     out_buffer = np.zeros(nr_groups, dtype='{{ sum_type }}')
 
-    for input_chunk_nr in range(ca_input.nchunks):
-        # fill input buffer
-        input_chunk = ca_input.chunks[input_chunk_nr]
-        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+    for in_buffer in bz.iterblocks(ca_input):
+        in_buffer_len = len(in_buffer)
 
         # loop through rows
-        for i in range(input_chunk_len):
+        for i in range(in_buffer_len):
 
             # go to next factor buffer if necessary
             if factor_chunk_row == factor_chunk_len:
@@ -402,58 +398,6 @@ cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
 {% if sum_type == "float64" %}
-                    v = in_buffer[i]
-                    if v == v:  # skip NA values
-                        out_buffer[current_index] += 1
-{%- else %}
-                    # TODO: Warning: int does not support NA values, is this what we need?
-                    out_buffer[current_index] += 1
-{%- endif %}
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='{{ sum_type }}')
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
-
-                    last_values[current_index] = v
-                else:
-                    raise NotImplementedError('sumtype not supported')
-
-    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
-    if leftover_elements > 0:
-        # fill input buffer
-        in_buffer = ca_input.leftover_array
-
-        # loop through rows
-        for i in range(leftover_elements):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
-{%- if sum_type == "float64" %}
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
