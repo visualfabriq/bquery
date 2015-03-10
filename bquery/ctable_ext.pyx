@@ -777,10 +777,10 @@ cpdef sum_int64(carray ca_input, carray ca_factor,
 @cython.boundscheck(False)
 cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
     cdef:
-        chunk input_chunk, factor_chunk
-        Py_ssize_t input_chunk_nr, input_chunk_len
+        chunk factor_chunk
+        Py_ssize_t in_buffer_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, factor_total_chunks, leftover_elements
+        Py_ssize_t current_index, i, factor_total_chunks
 
         ndarray in_buffer
         ndarray[npy_int64] factor_buffer
@@ -790,8 +790,6 @@ cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_
     ret = 0
     reverse = {}
 
-    input_chunk_len = ca_input.chunklen
-    in_buffer = np.empty(input_chunk_len, dtype=ca_input.dtype)
     factor_chunk_len = ca_factor.chunklen
     factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
@@ -804,37 +802,10 @@ cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_
     factor_chunk_row = 0
     out_buffer = np.zeros(nr_groups, dtype=ca_input.dtype)
 
-    for input_chunk_nr in range(ca_input.nchunks):
+    for in_buffer in bz.iterblocks(ca_input):
+        in_buffer_len = len(in_buffer)
 
-        # fill input buffer
-        input_chunk = ca_input.chunks[input_chunk_nr]
-        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
-
-        for i in range(input_chunk_len):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                out_buffer[current_index] = in_buffer[i]
-
-    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
-    if leftover_elements > 0:
-        in_buffer = ca_input.leftover_array
-
-        for i in range(leftover_elements):
+        for i in range(in_buffer_len):
 
             # go to next factor buffer if necessary
             if factor_chunk_row == factor_chunk_len:
