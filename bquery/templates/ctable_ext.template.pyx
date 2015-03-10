@@ -200,32 +200,20 @@ cpdef factorize(carray carray_, carray labels=None):
 @cython.boundscheck(False)
 cpdef translate_int64(carray input_, carray output_, dict lookup, npy_int64 default=-1):
     cdef:
-        chunk chunk_
-        Py_ssize_t i, chunklen, leftover_elements
+        Py_ssize_t chunklen, leftover_elements, len_in_buffer
         ndarray[npy_int64] in_buffer
         ndarray[npy_int64] out_buffer
 
     chunklen = input_.chunklen
     out_buffer = np.empty(chunklen, dtype='int64')
-    in_buffer = np.empty(chunklen, dtype='int64')
 
-    for i in range(input_.nchunks):
-        chunk_ = input_.chunks[i]
-        # decompress into in_buffer
-        chunk_._getitem(0, chunklen, in_buffer.data)
-        for i in range(chunklen):
+    for in_buffer in bz.iterblocks(input_):
+        len_in_buffer = len(in_buffer)
+        for i in range(len_in_buffer):
             element = in_buffer[i]
             out_buffer[i] = lookup.get(element, default)
         # compress out_buffer into labels
-        output_.append(out_buffer.astype(np.int64))
-
-    leftover_elements = cython.cdiv(input_.leftover, input_.atomsize)
-    if leftover_elements > 0:
-        in_buffer = input_.leftover_array
-        for i in range(leftover_elements):
-            element = in_buffer[i]
-            out_buffer[i] = lookup.get(element, default)
-        output_.append(out_buffer[:leftover_elements].astype(np.int64))
+        output_.append(out_buffer[:len_in_buffer].astype(np.int64))
 
 # ---------------------------------------------------------------------------
 # Aggregation Section (old)
