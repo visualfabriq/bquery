@@ -325,10 +325,9 @@ cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] val
 cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
-        chunk factor_chunk
-        Py_ssize_t in_buffer_len
-        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
+        Py_ssize_t in_buffer_len, factor_buffer_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_row
+        Py_ssize_t current_index, i, j, end_counts, start_counts
 
         ndarray[npy_{{ sum_type }}] in_buffer
         ndarray[npy_int64] factor_buffer
@@ -342,6 +341,7 @@ cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
     count = 0
     ret = 0
     reverse = {}
+    iter_ca_factor = bz.iterblocks(ca_factor)
 
     if agg_method == _COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
@@ -358,15 +358,9 @@ cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
 
         return num_uniques
 
-    factor_chunk_len = ca_factor.chunklen
-    factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
-    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
-    if factor_total_chunks > 0:
-        factor_chunk = ca_factor.chunks[factor_chunk_nr]
-        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-    else:
-        factor_buffer = ca_factor.leftover_array
+    factor_buffer = iter_ca_factor.next()
+    factor_buffer_len = len(factor_buffer)
     factor_chunk_row = 0
     out_buffer = np.zeros(nr_groups, dtype='{{ sum_type }}')
 
@@ -377,13 +371,9 @@ cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
         for i in range(in_buffer_len):
 
             # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
+            if factor_chunk_row == factor_buffer_len:
                 factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
+                factor_buffer = iter_ca_factor.next()
                 factor_chunk_row = 0
 
             # retrieve index
