@@ -130,6 +130,14 @@ class ctable(bcolz.ctable):
         boolarr: to be added (filtering the groupby factorization input)
         rootdir: the aggregation ctable rootdir
 
+        agg_method: Supported aggregation methods
+                    - 'sum'
+                    - 'count'
+                    - 'count_na'
+                    - 'count_distinct'
+                    - 'sorted_count_distinct', data should have been
+                          previously presorted
+
         """
         # TODO: change aggregation types to method as described in "a list with the type of aggregation for each column"
         map_agg_method = {
