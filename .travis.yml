@@ -8,12 +8,13 @@ python:
 install:
 - pip install --install-option='--no-cython-compile' cython
 - pip install numpy
+- pip install jinja2
 - git clone https://github.com/blosc/bcolz.git
 - cd bcolz
 - python setup.py build_ext --inplace
 - cd ..
 - export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
-- python setup.py build_ext --inplace
+- python setup.py build_ext --from-templates --inplace
 script:
 - nosetests bquery
 notifications:
