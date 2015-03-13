@@ -91,6 +91,35 @@ else:
 ########### End of checks ##########
 
 
+########### Project specific command line options ###########
+
+class bquery_build_ext(build_ext):
+    user_options = build_ext.user_options + \
+        [
+        ('from-templates', None,
+         "rebuild project from code generation templates"),
+        ]
+
+    def initialize_options(self):
+        self.from_templates = False
+        build_ext.initialize_options(self)
+
+    def run(self):
+        if self.from_templates:
+            try:
+                import jinja2
+            except:
+                exit_with_error(
+                    "You need the python package jinja2 to rebuild the " + \
+                    "extension from the templates")
+            execfile("bquery/templates/run_templates.py")
+
+        build_ext.run(self)
+
+
+######### End project specific command line options #########
+
+
 # bquery version
 VERSION = open('VERSION').read().strip()
 # Create the version.py file
@@ -128,7 +157,7 @@ setup(name="bquery",
       url='https://github.com/visualfabriq/bquery',
       license='http://www.opensource.org/licenses/bsd-license.php',
       platforms=['any'],
-      cmdclass={'build_ext': build_ext},
+      cmdclass={'build_ext': bquery_build_ext},
       ext_modules=[
           Extension("bquery.ctable_ext",
                     include_dirs=inc_dirs,

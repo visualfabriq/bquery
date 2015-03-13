@@ -72,9 +72,15 @@ export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 ```
 
 Go back to your bquery directory and repeat build and install steps.
+Note: ```bquery/templates/ctable_ext.template.pyx``` will be used as 
+template to generate the source file ```bquery/ctable_ext.pyx``` used 
+by the cython compiler, if you are developing new features remember to write 
+those modifications in the template file, ```bquery/ctable_ext.pyx```
+will be overwritten each time you run 
+```python setup.py build_ext --from-templates --inplace```. 
 
 ```
-python setup.py build_ext --inplace
+python setup.py build_ext --from-templates --inplace
 python setup.py install
 ```
 
