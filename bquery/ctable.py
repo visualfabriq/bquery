@@ -59,24 +59,8 @@ class ctable(bcolz.ctable):
                 col_factor_rootdir = col_rootdir + '.factor'
                 col_values_rootdir = col_rootdir + '.values'
 
-                carray_factor = \
-                    bcolz.carray([], dtype='int64', expectedlen=self.size,
-                                   rootdir=col_factor_rootdir, mode='w')
-                # ensure carray_factor.chunklen is multiple of column chunklen
-                if carray_factor.chunklen % self[col].chunklen != 0:
-                    chunklen_multiplier = round(carray_factor.chunklen / 
-                                                self[col].chunklen)
-                    if chunklen_multiplier < 1.0:
-                        chunklen_multiplier = 1
-                    chunklen_multiplier = int(round(chunklen_multiplier))
-                    carray_factor = \
-                        bcolz.carray([], dtype='int64', 
-                                     chunklen=chunklen_multiplier * \
-                                              self[col].chunklen,
-                                     rootdir=col_factor_rootdir, mode='w')
-
-                _, values = \
-                    ctable_ext.factorize(self[col], labels=carray_factor)
+                carray_factor, values = \
+                    ctable_ext.factorize(self[col], rootdir=col_factor_rootdir)
                 carray_factor.flush()
 
                 carray_values = \
@@ -207,7 +191,6 @@ class ctable(bcolz.ctable):
 
         return factor_list, values_list
 
-    @staticmethod
     def make_group_index(self, factor_list, values_list, groupby_cols,
                          array_length, bool_arr):
         # create unique groups for groupby loop

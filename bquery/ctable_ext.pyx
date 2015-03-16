@@ -12,12 +12,14 @@ from libc.string cimport strcpy, memcpy, memset
 from libcpp.vector cimport vector
 
 from khash cimport *
+import bcolz as bz
 from bcolz.carray_ext cimport carray, chunks, chunk
+
+include "parallel_processing.pxi"
 
 # ----------------------------------------------------------------------------
 #                        GLOBAL DEFINITIONS
 # ----------------------------------------------------------------------------
-
 SUM = 0
 DEF _SUM = 0
 
@@ -32,68 +34,11 @@ DEF _COUNT_DISTINCT = 3
 
 SORTED_COUNT_DISTINCT = 4
 DEF _SORTED_COUNT_DISTINCT = 4
+
+
 # ----------------------------------------------------------------------------
-
-
-cdef extern from *:
-    cdef void omp_start_critical "#pragma omp critical \n { //" () nogil
-    cdef void omp_end_critical "} //" () nogil
-
-
-@cython.wraparound(False)
-@cython.boundscheck(False)
-cdef omp_lock_t * par_initialise_kh_locks(unsigned int * num_threads) nogil:
-    cdef:
-        int i
-        omp_lock_t * kh_locks
-
-    num_threads[0] = omp_get_num_threads()
-    kh_locks = <omp_lock_t *> malloc(num_threads[0] * sizeof(omp_lock_t))
-    for i in range(num_threads[0]):
-        omp_init_lock(&kh_locks[i])
-
-    return kh_locks
-
-@cython.wraparound(False)
-@cython.boundscheck(False)
-cdef char * par_allocate_in_buffer(Py_ssize_t chunklen, 
-                                   Py_ssize_t itemsize) nogil:
-    return <char *>malloc(chunklen * itemsize * sizeof(char))
-
-@cython.wraparound(False)
-@cython.boundscheck(False)
-cdef uint64_t * par_allocate_out_buffer(Py_ssize_t chunklen, 
-                                       Py_ssize_t chunklen_multiplier) nogil:
-    return <uint64_t *>malloc(chunklen_multiplier * chunklen 
-                              * sizeof(uint64_t))
-
-
-@cython.wraparound(False)
-@cython.boundscheck(False)
-cdef check_labels_structure(carray carray_, carray labels):
-    # if no labels carray is given, create one with satisfying:
-    # labels.chunklen % carray_.chunklen = 0
-    if labels is None:
-        labels = carray([], dtype='int64', expectedlen=len(carray_))
-        chunklen_multiplier = round(labels.chunklen / carray_.chunklen)
-        if chunklen_multiplier < 1:
-            chunklen_multiplier = 1
-        chunklen_multiplier = int(round(chunklen_multiplier))
-        labels = carray([], dtype='int64', 
-                        chunklen=chunklen_multiplier * carray_.chunklen)
-
-    # if one was given, check chunklen is ok
-    elif labels.chunklen % carray_.chunklen != 0:
-        raise NotImplementedError('labels.chunklen must be a multiple of ' +
-                                  'carray_.chunklen')
-    # if labels was given, with ok chunklen, determine multiplier
-    else:
-        chunklen_multiplier = labels.chunklen / carray_.chunklen
-
-    return labels, chunklen_multiplier
-
-
-# Factorize Section
+#                           FACTORIZE SECTION
+# ----------------------------------------------------------------------------
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_str_helper(Py_ssize_t iter_range,
@@ -107,40 +52,39 @@ cdef void _factorize_str_helper(Py_ssize_t iter_range,
                        unsigned int num_threads,
                        ) nogil:
     cdef:
-        Py_ssize_t i, idx, itemsize
-        int ret
+        Py_ssize_t i, idx
         unsigned int j
-        char * element
-        char * insert
         khiter_t k
 
-    ret = 0
-    itemsize = allocation_size - 1
+        char * element
+        char * insert
+
+        int ret = 0
+        Py_ssize_t itemsize = allocation_size - 1
+
     # allocate enough memory to hold the string element, add one for the
     # null byte that marks the end of the string.
     # TODO: understand why zero-filling is necessary. Without zero-filling
     # the buffer, duplicate keys occur in the reverse dict
     element = <char *>calloc(allocation_size, sizeof(char))
 
+    # lock ensures that table is in consistend state during access
     omp_set_lock(&kh_locks[thread_id])
     for i in xrange(iter_range):
-        # strings are stored without null termination in ndarrays: need a 
-        # buffer to append null termination to use usual string algorithms
+        # appends null character to element string
         memcpy(element, in_buffer_ptr, itemsize)
         in_buffer_ptr += itemsize
 
-        # while reading from shared hash table, set lock for this thread
         k = kh_get_str(table, element)
         if k != table.n_buckets:
             idx = table.vals[k]
         else:
             omp_unset_lock(&kh_locks[thread_id])
-            # allocate enough memory to hold the string, add one for the
-            # null byte that marks the end of the string.
             insert = <char *>malloc(allocation_size)
             # TODO: is strcpy really the best way to copy a string?
             strcpy(insert, element)
-            # acquire locks for all threads before writing to shared resources
+
+            # acquire locks for all threads to avoid inconsistent state
             for j in xrange(num_threads):
                 omp_set_lock(&kh_locks[j])
             # check whether another thread has already added the entry by now
@@ -155,6 +99,7 @@ cdef void _factorize_str_helper(Py_ssize_t iter_range,
             # release all locks
             for j in xrange(num_threads):
                 omp_unset_lock(&kh_locks[j])
+            # acquire our own lock again, to indicate we are reading the table
             omp_set_lock(&kh_locks[thread_id])
         out_buffer[i] = idx
 
@@ -163,199 +108,99 @@ cdef void _factorize_str_helper(Py_ssize_t iter_range,
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-def factorize_str(carray carray_, carray labels=None):
+def factorize_str(carray carray_, unsigned int num_threads_requested = 0, **kwargs):
     cdef:
-        chunk chunk_
-        chunks labels_chunks
-        Py_ssize_t i, j, k, leftover_elements, \
-                   chunklen_multiplier
-        unsigned int thread_id
-        omp_lock_t chunk_lock, out_buffer_lock
-        char * in_buffer_ptr
+        Py_ssize_t i, blocklen, nblocks
+        khint_t j
+        carray labels
+        ndarray in_buffer
         ndarray[npy_uint64] out_buffer
-        char * out_buffer_org_ptr
-        uint64_t * out_buffer_ptr
+        unsigned int thread_id
+        par_info_t par_info
+
         kh_str_t *table
-        uintptr_t leftover_array_ptr
+        char * out_buffer_org_ptr
+        char * in_buffer_ptr
+        uint64_t * out_buffer_ptr
 
         Py_ssize_t count = 0
-        Py_ssize_t nchunks = carray_.nchunks
-        Py_ssize_t tmp_chunks_counter = 0
-        omp_lock_t * kh_locks = NULL
         dict reverse = {}
-        list tmp_chunks_list = []
-        # num_threads = 0: set the number of parallel threads automatically:
-        unsigned int num_threads = 0
 
-        Py_ssize_t chunklen = carray_.chunklen
-        Py_ssize_t allocation_size = carray_.dtype.itemsize + 1
+        bint first_thread = True
+        Py_ssize_t element_allocation_size = carray_.dtype.itemsize + 1
+        Py_ssize_t carray_chunklen = carray_.chunklen
 
-
-
-    labels, chunklen_multiplier = check_labels_structure(carray_, labels)
-
-    # provide access to cython chunks api for persistent labels
-    # fails with in-memory carray
-    if labels._rootdir is not None:
-        labels_chunks = labels.chunks
-
-    tmp_chunks_keys = [0] * int(carray_.size / labels.chunklen)
-
-    leftover_array_ptr = carray_.leftover_array.__array_interface__['data'][0]
-
-    table = kh_init_str()
-
-    # initialise locks for other shared resources
-    omp_init_lock(&chunk_lock)
-    omp_init_lock(&out_buffer_lock)
+    labels = create_labels_carray(carray_, **kwargs)
 
     out_buffer = np.empty(labels.chunklen, dtype='uint64')
     out_buffer_org_ptr = out_buffer.data
 
-    with nogil, parallel(num_threads=num_threads):
-        # Initialise shared locks for hash-table writes for each child thread.
+    table = kh_init_str()
+
+    block_iterator = bz.iterblocks(carray_, blen=labels.chunklen)
+    nblocks = <int>(len(carray_)/labels.chunklen+0.5)+1
+
+    with nogil, parallel(num_threads=num_threads_requested):
+        # Initialise some parallel processing stuff
         omp_start_critical()
-        (&kh_locks)[0] = par_initialise_kh_locks(&num_threads)
+        if first_thread == True:
+            (&first_thread)[0] = False
+            with gil:
+                par_initialise(&par_info, carray_)
         omp_end_critical()
+        
+        # allocate thread-local in- and out-buffers
+        with gil:
+            in_buffer_ptr = <char *>par_allocate_buffer(labels.chunklen, carray_.dtype.itemsize)
+            out_buffer_ptr = <uint64_t *>par_allocate_buffer(labels.chunklen, labels.dtype.itemsize)
 
-        # allocate an in-buffer and an out-buffer for each thread
-        in_buffer_ptr = par_allocate_in_buffer(chunklen, allocation_size-1)
-        out_buffer_ptr = par_allocate_out_buffer(chunklen, chunklen_multiplier)
-
-        for i in prange(0, <int>(nchunks/chunklen_multiplier)*chunklen_multiplier, chunklen_multiplier):
+        # factorise the chunks in parallel
+        for i in prange(0, nblocks, schedule='dynamic', chunksize=1):
             thread_id = threadid()
-            # pack the results from multiple carray_-chunks into one 
-            # labels-chunk: allows out-of-order writing of labels at good speed
-            for j in xrange(chunklen_multiplier):
-                # chunk._getitem is not thread-safe. This may be due to it
-                # setting properties of chunk using self. - Or not.
-                # TODO: check whether _getitem can be made thread-safe to 
-                #       get rid of this probably unnecessary thread lock
-                omp_set_lock(&chunk_lock)
-                with gil:
-                    chunk_ = carray_.chunks[i+j]
-                    # decompress into in_buffer
-                    # note: _getitem releases gil during blosc decompression
-                    chunk_._getitem(0, chunklen, in_buffer_ptr)
-                omp_unset_lock(&chunk_lock)
 
-                _factorize_str_helper(chunklen,
-                                allocation_size,
-                                in_buffer_ptr,
-                                out_buffer_ptr + j * chunklen,
-                                table,
-                                &count,
-                                thread_id,
-                                kh_locks,
-                                num_threads,
-                                )
+            omp_set_lock(&par_info.chunk_lock)
+            with gil:
+                in_buffer = np.ascontiguousarray(block_iterator.next())
+                blocklen = len(in_buffer)
+                memcpy(in_buffer_ptr, <char*>in_buffer.data, in_buffer.nbytes)
+            omp_unset_lock(&par_info.chunk_lock)
 
-            # note 2: labels.append(...) requires ndarray, but no thread-local 
-            #         ndarrays can be created. Use the shared out_buffer 
-            # ndarray object and redirect its data pointer to the thread-local
-            # c array out_buffer_ptr
-            omp_set_lock(&out_buffer_lock)
+            _factorize_str_helper(blocklen,
+                            element_allocation_size,
+                            in_buffer_ptr,
+                            out_buffer_ptr,
+                            table,
+                            &count,
+                            thread_id,
+                            par_info.kh_locks,
+                            par_info.num_threads,
+                            )
+
+            # compress out_buffer into labels
+            omp_set_lock(&par_info.out_buffer_lock)
             with gil:
                 out_buffer.data = <char *>out_buffer_ptr
-                # compress out_buffer into labels
-                # _save() and append() freeze at versions prior to v0.8.1
-                if labels._rootdir is not None:
-                    labels_chunks._save(int(i/chunklen_multiplier), chunk(out_buffer, labels._dtype, 
-                                                 labels._cparams, _memory=False))
-                    labels._cbytes += chunk_.cbytes
-                    labels._nbytes += labels.chunklen * labels.itemsize
-                    labels_chunks.nchunks += 1
-                # in-memory chunks cannot be "_save()"-ed but must be appended
-                # to a python chunk list
-                else:
-                    # TODO: Why does the following not work? (Freezes...)
-                    # tmp_chunks_list[i] = chunk(out_buffer, labels._dtype, labels._cparams, _memory=True)
-                    #
-                    # Work-around until above problem is solved.
-                    tmp_chunks_list.append(chunk(out_buffer, labels._dtype, 
-                                                 labels._cparams, _memory=True))
-                    tmp_chunks_keys[int(i/chunklen_multiplier)] = tmp_chunks_counter
-                    (&tmp_chunks_counter)[0] += 1
-
-            omp_unset_lock(&out_buffer_lock)
+                par_save_block(i, labels, out_buffer, blocklen, nblocks)
+            omp_unset_lock(&par_info.out_buffer_lock)
 
         # Clean-up thread local variables
         free(in_buffer_ptr)
         free(out_buffer_ptr)
 
-    # update chunk count (necessary due to use of _save() above
-    if labels._rootdir is None:
-        for i in xrange(tmp_chunks_counter):
-            labels.chunks.append(tmp_chunks_list[tmp_chunks_keys[i]])
-            labels._cbytes += tmp_chunks_list[tmp_chunks_keys[i]].cbytes
-            labels._nbytes += labels.chunklen * labels.itemsize
+    # Clean-up some parallel processing stuff
+    par_terminate(par_info)
 
-    # process remaining chunks that could not be processed en-bloc, chunks in-order
-    # TODO: parallelise after refactoring
-    # This is really slowing us down when chunk_multiplier = 1 !!!
-    # e.g. uncompressed unique()
-    in_buffer_ptr = <char *>malloc(chunklen * (allocation_size-1) * sizeof(char))
-    out_buffer_ptr = <uint64_t *>malloc(chunklen * sizeof(uint64_t))
-    out_buffer.data = <char *>out_buffer_ptr
-    for i in xrange(labels.size/carray_.chunklen, nchunks):
-        chunk_ = carray_.chunks[i]
-        chunk_._getitem(0, chunklen, in_buffer_ptr)
-        _factorize_str_helper(chunklen,
-                        allocation_size,
-                        in_buffer_ptr,
-                        out_buffer_ptr,
-                        table,
-                        &count,
-                        0,
-                        kh_locks,
-                        num_threads,
-                        )
-        #out_buffer.data = <char *>out_buffer_ptr
-        labels.append(out_buffer[:chunklen].astype(np.int64))
-
-
-    # processing of leftover_array is not parallelised in view of an upcoming
-    # changes to bcolz chunk access which will allow seamlessly folding 
-    # this into the prange block 
-    leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
-    if leftover_elements > 0:
-        _factorize_str_helper(leftover_elements,
-                            allocation_size,
-                            <char *>leftover_array_ptr,
-                            out_buffer_ptr,
-                            table,
-                            &count,
-                            0,
-                            kh_locks,
-                            num_threads,
-                            )
-        # compress out_buffer into labels
-        labels.append(out_buffer[:leftover_elements].astype(np.int64))
-
-    
-    free(in_buffer_ptr)
-    free(out_buffer_ptr)
-
-    # destroy and free all locks
-    for j in xrange(num_threads):
-        omp_destroy_lock(&kh_locks[j])
-    free(kh_locks)
-    omp_destroy_lock(&chunk_lock)
-    omp_destroy_lock(&out_buffer_lock)
-
-    # restore out_buffer data pointer to avoid segfault when python thries
-    # to free the object's data
+    # restore out_buffer data pointer to allow python to free the object's data
     out_buffer.data = out_buffer_org_ptr
 
     # construct python dict from vectors and free element memory
-    cdef unsigned long m
-    for m in xrange(table.n_buckets):
-        if not kh_exist_str(table, m):
+    for j in range(table.n_buckets):
+        if not kh_exist_str(table, j):
             continue
-        reverse[table.vals[m]] = <char*>table.keys[m]
-        free(<void*>table.keys[m])
+        reverse[table.vals[j]] = <char*>table.keys[j]
+        free(<void*>table.keys[j])
     kh_destroy_str(table)
-
+    
     return labels, reverse
 
 @cython.wraparound(False)
@@ -377,6 +222,7 @@ cdef void _factorize_int64_helper(Py_ssize_t iter_range,
     ret = 0
 
     for i in range(iter_range):
+        # TODO: Consider indexing directly into the array for efficiency
         element = in_buffer[i]
         k = kh_get_int64(table, element)
         if k != table.n_buckets:
@@ -392,8 +238,7 @@ cdef void _factorize_int64_helper(Py_ssize_t iter_range,
 @cython.boundscheck(False)
 def factorize_int64(carray carray_, carray labels=None):
     cdef:
-        chunk chunk_
-        Py_ssize_t n, i, count, chunklen, leftover_elements
+        Py_ssize_t len_carray, count, chunklen, len_in_buffer
         dict reverse
         ndarray[npy_int64] in_buffer
         ndarray[npy_uint64] out_buffer
@@ -403,19 +248,17 @@ def factorize_int64(carray carray_, carray labels=None):
     ret = 0
     reverse = {}
 
-    n = len(carray_)
+    len_carray = len(carray_)
     chunklen = carray_.chunklen
     if labels is None:
-        labels = carray([], dtype='int64', expectedlen=n)
+        labels = carray([], dtype='int64', expectedlen=len_carray)
+    # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
-    in_buffer = np.empty(chunklen, dtype='int64')
     table = kh_init_int64()
 
-    for i in range(carray_.nchunks):
-        chunk_ = carray_.chunks[i]
-        # decompress into in_buffer
-        chunk_._getitem(0, chunklen, in_buffer.data)
-        _factorize_int64_helper(chunklen,
+    for in_buffer in bz.iterblocks(carray_):
+        len_in_buffer = len(in_buffer)
+        _factorize_int64_helper(len_in_buffer,
                         carray_.dtype.itemsize + 1,
                         in_buffer,
                         out_buffer,
@@ -424,21 +267,7 @@ def factorize_int64(carray carray_, carray labels=None):
                         reverse,
                         )
         # compress out_buffer into labels
-        labels.append(out_buffer.astype(np.int64))
-
-    leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
-    if leftover_elements > 0:
-        _factorize_int64_helper(leftover_elements,
-                          carray_.dtype.itemsize + 1,
-                          carray_.leftover_array,
-                          out_buffer,
-                          table,
-                          &count,
-                          reverse,
-                          )
-
-    # compress out_buffer into labels
-    labels.append(out_buffer[:leftover_elements].astype(np.int64))
+        labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
     kh_destroy_int64(table)
 
@@ -463,6 +292,7 @@ cdef void _factorize_int32_helper(Py_ssize_t iter_range,
     ret = 0
 
     for i in range(iter_range):
+        # TODO: Consider indexing directly into the array for efficiency
         element = in_buffer[i]
         k = kh_get_int32(table, element)
         if k != table.n_buckets:
@@ -478,8 +308,7 @@ cdef void _factorize_int32_helper(Py_ssize_t iter_range,
 @cython.boundscheck(False)
 def factorize_int32(carray carray_, carray labels=None):
     cdef:
-        chunk chunk_
-        Py_ssize_t n, i, count, chunklen, leftover_elements
+        Py_ssize_t len_carray, count, chunklen, len_in_buffer
         dict reverse
         ndarray[npy_int32] in_buffer
         ndarray[npy_uint64] out_buffer
@@ -489,20 +318,17 @@ def factorize_int32(carray carray_, carray labels=None):
     ret = 0
     reverse = {}
 
-    n = len(carray_)
+    len_carray = len(carray_)
     chunklen = carray_.chunklen
     if labels is None:
-        labels = carray([], dtype='int64', expectedlen=n)
+        labels = carray([], dtype='int64', expectedlen=len_carray)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
-    in_buffer = np.empty(chunklen, dtype='int32')
     table = kh_init_int32()
 
-    for i in range(carray_.nchunks):
-        chunk_ = carray_.chunks[i]
-        # decompress into in_buffer
-        chunk_._getitem(0, chunklen, in_buffer.data)
-        _factorize_int32_helper(chunklen,
+    for in_buffer in bz.iterblocks(carray_):
+        len_in_buffer = len(in_buffer)
+        _factorize_int32_helper(len_in_buffer,
                         carray_.dtype.itemsize + 1,
                         in_buffer,
                         out_buffer,
@@ -511,21 +337,7 @@ def factorize_int32(carray carray_, carray labels=None):
                         reverse,
                         )
         # compress out_buffer into labels
-        labels.append(out_buffer.astype(np.int64))
-
-    leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
-    if leftover_elements > 0:
-        _factorize_int32_helper(leftover_elements,
-                          carray_.dtype.itemsize + 1,
-                          carray_.leftover_array,
-                          out_buffer,
-                          table,
-                          &count,
-                          reverse,
-                          )
-
-    # compress out_buffer into labels
-    labels.append(out_buffer[:leftover_elements].astype(np.int64))
+        labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
     kh_destroy_int32(table)
 
@@ -566,8 +378,7 @@ cdef void _factorize_float64_helper(Py_ssize_t iter_range,
 @cython.boundscheck(False)
 def factorize_float64(carray carray_, carray labels=None):
     cdef:
-        chunk chunk_
-        Py_ssize_t n, i, count, chunklen, leftover_elements
+        Py_ssize_t len_carray, count, chunklen, len_in_buffer
         dict reverse
         ndarray[npy_float64] in_buffer
         ndarray[npy_uint64] out_buffer
@@ -577,20 +388,17 @@ def factorize_float64(carray carray_, carray labels=None):
     ret = 0
     reverse = {}
 
-    n = len(carray_)
+    len_carray = len(carray_)
     chunklen = carray_.chunklen
     if labels is None:
-        labels = carray([], dtype='int64', expectedlen=n)
+        labels = carray([], dtype='int64', expectedlen=len_carray)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
-    in_buffer = np.empty(chunklen, dtype='float64')
     table = kh_init_float64()
 
-    for i in range(carray_.nchunks):
-        chunk_ = carray_.chunks[i]
-        # decompress into in_buffer
-        chunk_._getitem(0, chunklen, in_buffer.data)
-        _factorize_float64_helper(chunklen,
+    for in_buffer in bz.iterblocks(carray_):
+        len_in_buffer = len(in_buffer)
+        _factorize_float64_helper(len_in_buffer,
                         carray_.dtype.itemsize + 1,
                         in_buffer,
                         out_buffer,
@@ -599,36 +407,22 @@ def factorize_float64(carray carray_, carray labels=None):
                         reverse,
                         )
         # compress out_buffer into labels
-        labels.append(out_buffer.astype(np.int64))
-
-    leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
-    if leftover_elements > 0:
-        _factorize_float64_helper(leftover_elements,
-                          carray_.dtype.itemsize + 1,
-                          carray_.leftover_array,
-                          out_buffer,
-                          table,
-                          &count,
-                          reverse,
-                          )
-
-    # compress out_buffer into labels
-    labels.append(out_buffer[:leftover_elements].astype(np.int64))
+        labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
     kh_destroy_float64(table)
 
     return labels, reverse
 
-cpdef factorize(carray carray_, carray labels=None):
+def factorize(carray carray_, **kwargs):
     if carray_.dtype == 'int32':
-        labels, reverse = factorize_int32(carray_, labels=labels)
+        labels, reverse = factorize_int32(carray_, **kwargs)
     elif carray_.dtype == 'int64':
-        labels, reverse = factorize_int64(carray_, labels=labels)
+        labels, reverse = factorize_int64(carray_, **kwargs)
     elif carray_.dtype == 'float64':
-        labels, reverse = factorize_float64(carray_, labels=labels)
+        labels, reverse = factorize_float64(carray_, **kwargs)
     else:
         #TODO: check that the input is a string_ dtype type
-        labels, reverse = factorize_str(carray_, labels=labels)
+        labels, reverse = factorize_str(carray_, **kwargs)
     return labels, reverse
 
 # ---------------------------------------------------------------------------
@@ -637,32 +431,20 @@ cpdef factorize(carray carray_, carray labels=None):
 @cython.boundscheck(False)
 cpdef translate_int64(carray input_, carray output_, dict lookup, npy_int64 default=-1):
     cdef:
-        chunk chunk_
-        Py_ssize_t i, chunklen, leftover_elements
+        Py_ssize_t chunklen, leftover_elements, len_in_buffer
         ndarray[npy_int64] in_buffer
         ndarray[npy_int64] out_buffer
 
     chunklen = input_.chunklen
     out_buffer = np.empty(chunklen, dtype='int64')
-    in_buffer = np.empty(chunklen, dtype='int64')
 
-    for i in range(input_.nchunks):
-        chunk_ = input_.chunks[i]
-        # decompress into in_buffer
-        chunk_._getitem(0, chunklen, in_buffer.data)
-        for i in range(chunklen):
+    for in_buffer in bz.iterblocks(input_):
+        len_in_buffer = len(in_buffer)
+        for i in range(len_in_buffer):
             element = in_buffer[i]
             out_buffer[i] = lookup.get(element, default)
         # compress out_buffer into labels
-        output_.append(out_buffer.astype(np.int64))
-
-    leftover_elements = cython.cdiv(input_.leftover, input_.atomsize)
-    if leftover_elements > 0:
-        in_buffer = input_.leftover_array
-        for i in range(leftover_elements):
-            element = in_buffer[i]
-            out_buffer[i] = lookup.get(element, default)
-        output_.append(out_buffer[:leftover_elements].astype(np.int64))
+        output_.append(out_buffer[:len_in_buffer].astype(np.int64))
 
 # ---------------------------------------------------------------------------
 # Aggregation Section (old)
@@ -695,7 +477,7 @@ def agg_sum(iter_):
 @cython.wraparound(False)
 def groupsort_indexer(carray index, Py_ssize_t ngroups):
     cdef:
-        Py_ssize_t i, label, n
+        Py_ssize_t i, label, n, len_in_buffer
         ndarray[int64_t] counts, where, np_result
         # --
         carray c_result
@@ -712,22 +494,10 @@ def groupsort_indexer(carray index, Py_ssize_t ngroups):
     counts = np.zeros(ngroups + 1, dtype=np.int64)
     n = len(index)
 
-    for index_chunk_nr in range(index.nchunks):
-        # fill input buffer
-        input_chunk = index.chunks[index_chunk_nr]
-        input_chunk._getitem(0, index_chunk_len, in_buffer.data)
-
+    for in_buffer in bz.iterblocks(index):
+        len_in_buffer = len(in_buffer)
         # loop through rows
-        for i in range(index_chunk_len):
-            counts[index[i] + 1] += 1
-
-    leftover_elements = cython.cdiv(index.leftover, index.atomsize)
-    if leftover_elements > 0:
-        # fill input buffer
-        in_buffer = index.leftover_array
-
-        # loop through rows
-        for i in range(leftover_elements):
+        for i in range(len_in_buffer):
             counts[index[i] + 1] += 1
 
     # mark the start of each contiguous group of like-indexed data
@@ -826,12 +596,11 @@ cdef count_unique_int32(ndarray[int32_t] values):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef sum_float64(carray ca_input, carray ca_factor,
-                 Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
+               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
-        chunk input_chunk, factor_chunk
-        Py_ssize_t input_chunk_nr, input_chunk_len
-        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
+        Py_ssize_t in_buffer_len, factor_buffer_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_row
+        Py_ssize_t current_index, i, j, end_counts, start_counts
 
         ndarray[npy_float64] in_buffer
         ndarray[npy_int64] factor_buffer
@@ -842,10 +611,10 @@ cdef sum_float64(carray ca_input, carray ca_factor,
         bint count_distinct_started = 0
         carray num_uniques
 
-
     count = 0
     ret = 0
     reverse = {}
+    iter_ca_factor = bz.iterblocks(ca_factor)
 
     if agg_method == _COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
@@ -862,36 +631,22 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 
         return num_uniques
 
-    input_chunk_len = ca_input.chunklen
-    in_buffer = np.empty(input_chunk_len, dtype='float64')
-    factor_chunk_len = ca_factor.chunklen
-    factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
-    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
-    if factor_total_chunks > 0:
-        factor_chunk = ca_factor.chunks[factor_chunk_nr]
-        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-    else:
-        factor_buffer = ca_factor.leftover_array
+    factor_buffer = iter_ca_factor.next()
+    factor_buffer_len = len(factor_buffer)
     factor_chunk_row = 0
     out_buffer = np.zeros(nr_groups, dtype='float64')
 
-    for input_chunk_nr in range(ca_input.nchunks):
-        # fill input buffer
-        input_chunk = ca_input.chunks[input_chunk_nr]
-        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+    for in_buffer in bz.iterblocks(ca_input):
+        in_buffer_len = len(in_buffer)
 
         # loop through rows
-        for i in range(input_chunk_len):
+        for i in range(in_buffer_len):
 
             # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
+            if factor_chunk_row == factor_buffer_len:
                 factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
+                factor_buffer = iter_ca_factor.next()
                 factor_chunk_row = 0
 
             # retrieve index
@@ -905,53 +660,7 @@ cdef sum_float64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
-                    v = in_buffer[i]
-                    if v == v:  # skip NA values
-                        out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='float64')
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
 
-                    last_values[current_index] = v
-                else:
-                    raise NotImplementedError('sumtype not supported')
-
-    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
-    if leftover_elements > 0:
-        # fill input buffer
-        in_buffer = ca_input.leftover_array
-
-        # loop through rows
-        for i in range(leftover_elements):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
                     v = in_buffer[i]
                     if v == v:  # skip NA values
                         out_buffer[current_index] += 1
@@ -981,10 +690,9 @@ cdef sum_float64(carray ca_input, carray ca_factor,
 cdef sum_int32(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
-        chunk input_chunk, factor_chunk
-        Py_ssize_t input_chunk_nr, input_chunk_len
-        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
+        Py_ssize_t in_buffer_len, factor_buffer_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_row
+        Py_ssize_t current_index, i, j, end_counts, start_counts
 
         ndarray[npy_int32] in_buffer
         ndarray[npy_int64] factor_buffer
@@ -998,6 +706,7 @@ cdef sum_int32(carray ca_input, carray ca_factor,
     count = 0
     ret = 0
     reverse = {}
+    iter_ca_factor = bz.iterblocks(ca_factor)
 
     if agg_method == _COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
@@ -1014,36 +723,22 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 
         return num_uniques
 
-    input_chunk_len = ca_input.chunklen
-    in_buffer = np.empty(input_chunk_len, dtype='int32')
-    factor_chunk_len = ca_factor.chunklen
-    factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
-    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
-    if factor_total_chunks > 0:
-        factor_chunk = ca_factor.chunks[factor_chunk_nr]
-        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-    else:
-        factor_buffer = ca_factor.leftover_array
+    factor_buffer = iter_ca_factor.next()
+    factor_buffer_len = len(factor_buffer)
     factor_chunk_row = 0
     out_buffer = np.zeros(nr_groups, dtype='int32')
 
-    for input_chunk_nr in range(ca_input.nchunks):
-        # fill input buffer
-        input_chunk = ca_input.chunks[input_chunk_nr]
-        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+    for in_buffer in bz.iterblocks(ca_input):
+        in_buffer_len = len(in_buffer)
 
         # loop through rows
-        for i in range(input_chunk_len):
+        for i in range(in_buffer_len):
 
             # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
+            if factor_chunk_row == factor_buffer_len:
                 factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
+                factor_buffer = iter_ca_factor.next()
                 factor_chunk_row = 0
 
             # retrieve index
@@ -1057,52 +752,7 @@ cdef sum_int32(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
-                    # TODO: Warning: int does not support NA values, is this what we need?
-                    out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='int32')
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
 
-                    last_values[current_index] = v
-                else:
-                    raise NotImplementedError('sumtype not supported')
-
-    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
-    if leftover_elements > 0:
-        # fill input buffer
-        in_buffer = ca_input.leftover_array
-
-        # loop through rows
-        for i in range(leftover_elements):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 elif agg_method == _SORTED_COUNT_DISTINCT:
@@ -1131,10 +781,9 @@ cdef sum_int32(carray ca_input, carray ca_factor,
 cdef sum_int64(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
-        chunk input_chunk, factor_chunk
-        Py_ssize_t input_chunk_nr, input_chunk_len
-        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
+        Py_ssize_t in_buffer_len, factor_buffer_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_row
+        Py_ssize_t current_index, i, j, end_counts, start_counts
 
         ndarray[npy_int64] in_buffer
         ndarray[npy_int64] factor_buffer
@@ -1148,6 +797,7 @@ cdef sum_int64(carray ca_input, carray ca_factor,
     count = 0
     ret = 0
     reverse = {}
+    iter_ca_factor = bz.iterblocks(ca_factor)
 
     if agg_method == _COUNT_DISTINCT:
         num_uniques = carray([], dtype='int64')
@@ -1164,36 +814,22 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 
         return num_uniques
 
-    input_chunk_len = ca_input.chunklen
-    in_buffer = np.empty(input_chunk_len, dtype='int64')
-    factor_chunk_len = ca_factor.chunklen
-    factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
-    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
-    if factor_total_chunks > 0:
-        factor_chunk = ca_factor.chunks[factor_chunk_nr]
-        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-    else:
-        factor_buffer = ca_factor.leftover_array
+    factor_buffer = iter_ca_factor.next()
+    factor_buffer_len = len(factor_buffer)
     factor_chunk_row = 0
     out_buffer = np.zeros(nr_groups, dtype='int64')
 
-    for input_chunk_nr in range(ca_input.nchunks):
-        # fill input buffer
-        input_chunk = ca_input.chunks[input_chunk_nr]
-        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+    for in_buffer in bz.iterblocks(ca_input):
+        in_buffer_len = len(in_buffer)
 
         # loop through rows
-        for i in range(input_chunk_len):
+        for i in range(in_buffer_len):
 
             # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
+            if factor_chunk_row == factor_buffer_len:
                 factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
+                factor_buffer = iter_ca_factor.next()
                 factor_chunk_row = 0
 
             # retrieve index
@@ -1207,52 +843,7 @@ cdef sum_int64(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
-                    # TODO: Warning: int does not support NA values, is this what we need?
-                    out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='int64')
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
 
-                    last_values[current_index] = v
-                else:
-                    raise NotImplementedError('sumtype not supported')
-
-    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
-    if leftover_elements > 0:
-        # fill input buffer
-        in_buffer = ca_input.leftover_array
-
-        # loop through rows
-        for i in range(leftover_elements):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
                     # TODO: Warning: int does not support NA values, is this what we need?
                     out_buffer[current_index] += 1
                 elif agg_method == _SORTED_COUNT_DISTINCT:
@@ -1280,10 +871,9 @@ cdef sum_int64(carray ca_input, carray ca_factor,
 @cython.boundscheck(False)
 cdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
     cdef:
-        chunk input_chunk, factor_chunk
-        Py_ssize_t input_chunk_nr, input_chunk_len
-        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, factor_total_chunks, leftover_elements
+        Py_ssize_t in_buffer_len, factor_buffer_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_row
+        Py_ssize_t current_index, i, factor_total_chunks
 
         ndarray in_buffer
         ndarray[npy_int64] factor_buffer
@@ -1292,61 +882,25 @@ cdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_s
     count = 0
     ret = 0
     reverse = {}
+    iter_ca_factor = bz.iterblocks(ca_factor)
 
-    input_chunk_len = ca_input.chunklen
-    in_buffer = np.empty(input_chunk_len, dtype=ca_input.dtype)
-    factor_chunk_len = ca_factor.chunklen
+
     factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
-    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
-    if factor_total_chunks > 0:
-        factor_chunk = ca_factor.chunks[factor_chunk_nr]
-        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-    else:
-        factor_buffer = ca_factor.leftover_array
+    factor_buffer = iter_ca_factor.next()
+    factor_buffer_len = len(factor_buffer)
     factor_chunk_row = 0
     out_buffer = np.zeros(nr_groups, dtype=ca_input.dtype)
 
-    for input_chunk_nr in range(ca_input.nchunks):
+    for in_buffer in bz.iterblocks(ca_input):
+        in_buffer_len = len(in_buffer)
 
-        # fill input buffer
-        input_chunk = ca_input.chunks[input_chunk_nr]
-        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
-
-        for i in range(input_chunk_len):
+        for i in range(in_buffer_len):
 
             # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
+            if factor_chunk_row == factor_buffer_len:
                 factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                out_buffer[current_index] = in_buffer[i]
-
-    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
-    if leftover_elements > 0:
-        in_buffer = ca_input.leftover_array
-
-        for i in range(leftover_elements):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
+                factor_buffer = iter_ca_factor.next()
                 factor_chunk_row = 0
 
             # retrieve index
