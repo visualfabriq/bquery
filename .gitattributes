@@ -1,0 +1,9 @@
+# Set the default behavior, in case people don't have core.autocrlf set.
+* text=auto
+
+# specific extension to undergo this two-way normalization
+*.c   text
+*.h   text
+*.py  text
+*.pyx text
+*.pxd text
