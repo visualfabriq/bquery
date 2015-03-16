@@ -1,22 +1,11 @@
 #include <Python.h>
 
-typedef double khfloat64_t;
-
 #include "khash.h"
-
-#define kh_exist_str(h, k) (kh_exist(h, k))
-#define kh_exist_float64(h, k) (kh_exist(h, k))
-#define kh_exist_int64(h, k) (kh_exist(h, k))
-#define kh_exist_int32(h, k) (kh_exist(h, k))
-
-KHASH_MAP_INIT_STR(str, size_t)
-KHASH_MAP_INIT_INT(int32, size_t)
-KHASH_MAP_INIT_INT64(int64, size_t)
 
 // kludge
 
 #define kh_float64_hash_func _Py_HashDouble
-#define kh_float64_hash_equal kh_int64_hash_equal
+#define kh_float64_hash_equal(a, b) ((a) == (b) || ((b) != (b) && (a) != (a)))
 
 #define KHASH_MAP_INIT_FLOAT64(name, khval_t)								\
 	KHASH_INIT(name, khfloat64_t, khval_t, 1, kh_float64_hash_func, kh_float64_hash_equal)
@@ -24,7 +13,7 @@ KHASH_MAP_INIT_INT64(int64, size_t)
 KHASH_MAP_INIT_FLOAT64(float64, size_t)
 
 
-int kh_inline pyobject_cmp(PyObject* a, PyObject* b) {
+int PANDAS_INLINE pyobject_cmp(PyObject* a, PyObject* b) {
 	int result = PyObject_RichCompareBool(a, b, Py_EQ);
 	if (result < 0) {
 		PyErr_Clear();
