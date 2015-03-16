@@ -91,6 +91,64 @@ else:
 ########### End of checks ##########
 
 
+########### Project-specific build options ###########
+
+copt = {'cygwin': ['-fopenmp'],
+        'emx': ['-fopenmp'],
+        'intel': ['-openmp'],
+        'intele': ['-openmp'],
+        'intelem': ['-openmp'],
+        'mingw32': ['-fopenmp'],
+        'msvc': ['/openmp'],
+        }
+lopt = {'cygwin': ['-fopenmp'],
+        'emx': ['-fopenmp'],
+        'mingw32': ['-fopenmp'],
+        }
+
+class bquery_build_ext(build_ext):
+    user_options = build_ext.user_options + \
+        [
+        ('from-templates', None,
+         "rebuild project from code generation templates"),
+        ]
+
+    def initialize_options(self):
+        self.from_templates = False
+        build_ext.initialize_options(self)
+
+    def run(self):
+        # regenerate cython code from templates
+        if self.from_templates:
+            try:
+                import jinja2
+            except:
+                exit_with_error(
+                    "You need the python package jinja2 to rebuild the " + \
+                    "extension from the templates")
+            execfile("bquery/templates/run_templates.py")
+
+        build_ext.run(self)
+
+    def build_extensions(self):
+        # set compiler-specific build flags, e.g. for openmp
+        c = self.compiler.compiler_type
+        if copt.has_key(c):
+           for e in self.extensions:
+               e.extra_compile_args += copt[ c ]
+        else:
+            print_warning(
+                "Openmp flags for compiler '%s' not configured in setup.py." +
+                "Building without parallel processing support.")
+        if lopt.has_key(c):
+            for e in self.extensions:
+                e.extra_link_args += lopt[ c ]
+        build_ext.build_extensions(self)
+
+
+######### End project-specific build options #########
+
+
 # bquery version
 VERSION = open('VERSION').read().strip()
 # Create the version.py file
@@ -102,10 +160,6 @@ CFLAGS = os.environ.get('CFLAGS', '').split()
 LFLAGS = os.environ.get('LFLAGS', '').split()
 # Allow setting the Blosc dir if installed in the system
 BLOSC_DIR = os.environ.get('BLOSC_DIR', '')
-
-# OpenMP libraries
-CFLAGS.append('-fopenmp')
-LFLAGS.append('-fopenmp')
 
 # Sources & libraries
 inc_dirs = ['bquery']
@@ -132,7 +186,7 @@ setup(name="bquery",
       url='https://github.com/visualfabriq/bquery',
       license='http://www.opensource.org/licenses/bsd-license.php',
       platforms=['any'],
-      cmdclass={'build_ext': build_ext},
+      cmdclass={'build_ext': bquery_build_ext},
       ext_modules=[
           Extension("bquery.ctable_ext",
                     include_dirs=inc_dirs,
