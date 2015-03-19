@@ -32,7 +32,7 @@ class ctable(bcolz.ctable):
         else:
             return False
 
-    def cache_factor(self, col_list, refresh=False):
+    def cache_factor(self, col_list, refresh=False, **kwargs):
         """
         Existing todos here are: these should be hidden helper carrays
         As in: not normal columns that you would normally see as a user
@@ -61,14 +61,14 @@ class ctable(bcolz.ctable):
 
                 carray_factor = \
                     bcolz.carray([], dtype='int64', expectedlen=self.size,
-                                   rootdir=col_factor_rootdir, mode='w')
+                                   rootdir=col_factor_rootdir, mode='w', **kwargs)
                 _, values = \
                     ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
 
                 carray_values = \
                     bcolz.carray(values.values(), dtype=self[col].dtype,
-                                 rootdir=col_values_rootdir, mode='w')
+                                 rootdir=col_values_rootdir, mode='w', **kwargs)
                 carray_values.flush()
 
     def unique(self, col_or_col_list):
