@@ -8,9 +8,133 @@ from collections import namedtuple
 import os
 from bquery.ctable_ext import \
     SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
+import ast
+from types import ModuleType
+try:
+    import meta
+except ImportError:
+    pass
 
 
 class ctable(bcolz.ctable):
+    ###
+    ### Overriding bcolz.ctable methods
+    ###
+
+    def __init__(self, *args, **kwargs):
+        self._transformers = []
+        self.intermediary_cparams = None
+        super(ctable, self).__init__(*args, **kwargs)
+
+    def eval(self, expression, **kwargs):
+        # TODO: clean this up/simplify once Blosc/bcolz#164 is resolved
+        user_dict = kwargs.pop('user_dict', {})
+        if len(self._transformers) > 0 \
+                and type(expression) is str:
+            expression, user_dict = self.transform_query(expression)
+            # TODO: clean this up/simplify once Blosc/bcolz#162 is resolved
+            if expression in ['True', 'False']:
+                out_flavor = kwargs.pop('out_flavor', None)
+                if out_flavor is None:
+                    out_flavor = bcolz.defaults.eval_out_flavor
+                if out_flavor == 'numpy':
+                    np.array([expression=='True']*len(self), dtype=dtype) \
+                        .view(np.ndarray)
+                else:
+                    return bcolz.carray([expression=='True']*len(self))
+
+        if len(user_dict) == 0:
+            user_dict.update({key: self.cols[key] for key in self.cols})
+        return bcolz.eval(expression, user_dict=user_dict, **kwargs)
+
+    def where(self, expression, outcols=None, limit=None, skip=0):
+        # if query transformers are defined, transform query
+        if len(self._transformers) > 0 \
+                and type(expression) is str:
+            expression, user_dict = self.transform_query(expression)
+            cparams = kwargs.pop('cparams', self.intermediary_cparams)
+            expression = self.eval(expression, user_dict=user_dict,
+                                   cparams=cparams)
+        return super(ctable, self).where(expression, outcols=outcols, 
+                                         limit=limit, skip=skip)
+
+    def __getitem__(self, key):
+        # if query transformers are defined, transform query
+        if len(self._transformers) > 0 \
+                and isinstance(key, bcolz.py2help._strtypes) \
+                and key not in self.names:
+            # key is not a column name, try to evaluate
+            key, user_dict = self.transform_query(key)
+            # TODO: clean this up/simplify once Blosc/bcolz#164 is resolved
+            user_dict.update({key: self.cols[key] for key in self.cols})
+            arr = bcolz.eval(key, user_dict=user_dict, depth=3, 
+                             cparams=self.intermediary_cparams)
+            if arr.dtype.type != np.bool_:
+                raise IndexError(
+                    "`key` %s does not represent a boolean "
+                    "expression" % key)
+            # TODO: clean this up once Blosc/bcolz#162 is resolved
+            elif arr == False:
+                dtype = np.dtype([(name, self.cols[name].dtype) 
+                                  for name in self.names])
+                return np.empty(0, dtype=dtype).view(np.ndarray)
+            return self._where(arr)
+
+        return super(ctable, self).__getitem__(key)
+
+    ###
+    ### Extending bcolz.ctable
+    ###
+
+    @property
+    def transformers(self):
+        """The list of :class:`QueryTransformer` instances that are applied 
+        automatically to all query strings."""
+
+        return self._transformers
+
+    @transformers.setter
+    def transformers(self, value):
+        # enable query transformation if the required modules are installed
+        try:
+            if not isinstance(meta, ModuleType):
+                raise NameError()
+        except NameError:
+            raise RuntimeError(
+                'Query transformation requires the module `meta`.')
+            return
+        self._transformers = value
+
+    def transform_query(self, query, user_dict=None):
+        """transform_query(query, user_dict=None)
+        
+        Applies the :class:`QueryTransformer` instances configured in 
+        :attr:`self.transformers` to the `query`.
+        
+        Parameters
+        ----------
+        query : string
+            A string forming a boolean expression, like 
+            "(col1 == 'Example') & (col2 != 'Text')".
+
+        Returns
+        -------
+        out : (string, dict)
+            A tuple containing the transformed query string and a dictionary
+            where the variables added by the transformer can be found by name.
+        """
+
+        ast_tree = ast.parse(query)
+        if not ast_tree:
+            return query
+
+        if user_dict is None:
+            user_dict = {}
+        for transformer in self._transformers:
+            ast_tree = transformer.apply(self, ast_tree, user_dict)
+        
+        return meta.dump_python_source(ast_tree).strip(), user_dict
+
     def cache_valid(self, col):
         """
         Checks whether the column has a factorization that exists and is not older than the source
