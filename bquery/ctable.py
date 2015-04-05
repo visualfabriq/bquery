@@ -51,6 +51,9 @@ class ctable(bcolz.ctable):
             raise TypeError('Only out-of-core ctables can have '
                             'factorization caching at the moment')
 
+        if not isinstance(col_list, list):
+            col_list = [col_list]
+
         for col in col_list:
 
             # create cache if needed
