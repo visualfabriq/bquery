@@ -376,7 +376,7 @@ cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] val
 {% for sum_type in sum_types -%}
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
+cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
         chunk input_chunk, factor_chunk
@@ -540,7 +540,7 @@ cdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
+cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_ssize_t skip_key):
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
@@ -624,46 +624,6 @@ cdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_s
         np.delete(out_buffer, skip_key)
 
     return out_buffer
-
-def aggregate_groups_by_iter_2(ct_input,
-                        ct_agg,
-                        npy_uint64 nr_groups,
-                        npy_uint64 skip_key,
-                        carray factor_carray,
-                        groupby_cols,
-                        output_agg_ops,
-                        dtype_list,
-                        agg_method=_SUM
-                        ):
-    total = []
-
-    for col in groupby_cols:
-        total.append(groupby_value(ct_input[col], factor_carray, nr_groups, skip_key))
-
-    for col, agg_op in output_agg_ops:
-        # TODO: input vs output column
-        col_dtype = ct_agg[col].dtype
-        if col_dtype == np.float64:
-            total.append(
-                sum_float64(ct_input[col], factor_carray, nr_groups, skip_key,
-                            agg_method=agg_method)
-            )
-        elif col_dtype == np.int64:
-            total.append(
-                sum_int64(ct_input[col], factor_carray, nr_groups, skip_key,
-                          agg_method=agg_method)
-            )
-        elif col_dtype == np.int32:
-            total.append(
-                sum_int32(ct_input[col], factor_carray, nr_groups, skip_key,
-                          agg_method=agg_method)
-            )
-        else:
-            raise NotImplementedError(
-                'Column dtype ({0}) not supported for aggregation yet '
-                '(only int32, int64 & float64)'.format(str(col_dtype)))
-
-    ct_agg.append(total)
 
 # ---------------------------------------------------------------------------
 # Temporary Section
