@@ -109,7 +109,8 @@ class ctable(bcolz.ctable):
 
     def aggregate_groups_by_iter_2(self, ct_agg, nr_groups, skip_key,
                                    factor_carray, groupby_cols, output_agg_ops,
-                                   dtype_list, agg_method=ctable_ext.SUM):
+                                   bool_arr=None,
+                                   agg_method=ctable_ext.SUM):
         total = []
 
         for col in groupby_cols:
@@ -135,6 +136,15 @@ class ctable(bcolz.ctable):
                     '(only int32, int64 & float64)'.format(str(col_dtype)))
 
             total.append(r)
+
+        # TODO: fix ugly fix?
+        if bool_arr is not None:
+            total_v2 = []
+            for a in total:
+                total_v2.append(
+                    [item for (n, item) in enumerate(a) if n != skip_key])
+            total = total_v2
+        # end of fix
 
         ct_agg.append(total)
 
@@ -196,7 +206,8 @@ class ctable(bcolz.ctable):
         # perform aggregation
         self.aggregate_groups_by_iter_2(ct_agg, nr_groups, skip_key,
                                         factor_carray, groupby_cols,
-                                        agg_ops, dtype_list,
+                                        agg_ops,
+                                        bool_arr= bool_arr,
                                         agg_method=_agg_method)
 
         return ct_agg
