@@ -110,6 +110,47 @@ class ctable(bcolz.ctable):
 
         return output
 
+    def aggregate_groups_by_iter_2(self, ct_agg, nr_groups, skip_key,
+                                   factor_carray, groupby_cols, output_agg_ops,
+                                   bool_arr=None,
+                                   agg_method=ctable_ext.SUM):
+        total = []
+
+        for col in groupby_cols:
+            total.append(ctable_ext.groupby_value(self[col], factor_carray,
+                                                  nr_groups, skip_key))
+
+        for col, agg_op in output_agg_ops:
+            # TODO: input vs output column
+            col_dtype = ct_agg[col].dtype
+
+            if col_dtype == np.float64:
+                r = ctable_ext.sum_float64(self[col], factor_carray, nr_groups,
+                                           skip_key, agg_method=agg_method)
+            elif col_dtype == np.int64:
+                r = ctable_ext.sum_int64(self[col], factor_carray, nr_groups,
+                                         skip_key, agg_method=agg_method)
+            elif col_dtype == np.int32:
+                r = ctable_ext.sum_int32(self[col], factor_carray, nr_groups,
+                                         skip_key, agg_method=agg_method)
+            else:
+                raise NotImplementedError(
+                    'Column dtype ({0}) not supported for aggregation yet '
+                    '(only int32, int64 & float64)'.format(str(col_dtype)))
+
+            total.append(r)
+
+        # TODO: fix ugly fix?
+        if bool_arr is not None:
+            total_v2 = []
+            for a in total:
+                total_v2.append(
+                    [item for (n, item) in enumerate(a) if n != skip_key])
+            total = total_v2
+        # end of fix
+
+        ct_agg.append(total)
+
     def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None,
                 agg_method='sum'):
         """
@@ -166,10 +207,11 @@ class ctable(bcolz.ctable):
             self.create_agg_ctable(groupby_cols, agg_list, nr_groups, rootdir)
 
         # perform aggregation
-        ctable_ext.aggregate_groups_by_iter_2(self, ct_agg, nr_groups, skip_key,
-                                              factor_carray, groupby_cols,
-                                              agg_ops, dtype_list,
-                                              agg_method=_agg_method)
+        self.aggregate_groups_by_iter_2(ct_agg, nr_groups, skip_key,
+                                        factor_carray, groupby_cols,
+                                        agg_ops,
+                                        bool_arr= bool_arr,
+                                        agg_method=_agg_method)
 
         return ct_agg
 
@@ -274,6 +316,7 @@ class ctable(bcolz.ctable):
     def create_agg_ctable(self, groupby_cols, agg_list, nr_groups, rootdir):
         # create output table
         dtype_list = []
+
         for col in groupby_cols:
             dtype_list.append((col, self[col].dtype))
 

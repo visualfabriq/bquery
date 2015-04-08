@@ -9,12 +9,29 @@ import shutil
 import nose
 import numpy as np
 import math
+import bcolz as bz
 from numpy.testing import assert_array_equal
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
 import itertools as itt
+from contextlib import contextmanager
 
 class TestCtable():
+    @contextmanager
+    def on_disk_data_cleaner(self, data):
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        ct = bquery.ctable(data, rootdir=self.rootdir)
+        # print ct
+        ct.flush()
+        ct = bquery.open(self.rootdir)
+
+        yield ct
+
+        shutil.rmtree(self.rootdir)
+        self.rootdir = None
+
+
     def setup(self):
         print 'TestCtable.setup'
         self.rootdir = None
@@ -583,6 +600,134 @@ class TestCtable():
 
         assert_list_equal(
             [list(x) for x in result_bcolz], ref)
+
+    def test_groupby_10(self):
+        """
+        test_groupby_10: Groupby's 'sorted_count_distinct', no column provided
+        """
+        random.seed(1)
+
+        groupby_cols = []
+        agg_list = ['f1', 'f2']
+        num_rows = 10
+
+        # -- Data --
+        data = np.array(
+            [(0, 1, 1),
+             (1, 1, 1),
+             (1, 2, 1),
+             (0, 2, 1),
+             (1, 2, 1),
+             (2, 2, 1),
+             (0, 3, 2),
+             (0, 3, 2),
+             (1, 4, 2)],
+            dtype='i8,i8,i8')
+
+
+        # -- Bcolz --
+        with self.on_disk_data_cleaner(data) as ct:
+            result_bcolz = ct.groupby(groupby_cols, agg_list,
+                                      agg_method='sorted_count_distinct')
+
+        assert_list_equal([list(x) for x in result_bcolz], [[4, 2]])
+
+
+    def test_groupby_11(self):
+        """
+        test_groupby_11: Groupby's 'sorted_count_distinct', pre-filter  &
+                         no column provided
+
+        """
+        random.seed(1)
+
+        groupby_cols = []
+        agg_list = ['f1', 'f2']
+        num_rows = 10
+
+        # -- Data --
+        data = np.array(
+            [(0, 1, 1),
+             (1, 1, 1),
+             (1, 2, 1),
+             (0, 2, 1),
+             (1, 2, 1),
+             (2, 2, 1),
+             (0, 3, 2),
+             (0, 3, 2),
+             (1, 4, 2)],
+            dtype='i8,i8,i8')
+
+
+        with self.on_disk_data_cleaner(data) as ct:
+            barr = ct.where_terms( [('f0', 'in', [0])] )
+            result_bcolz = ct.groupby(groupby_cols, agg_list,
+                                      bool_arr=barr,
+                                      agg_method='sorted_count_distinct')
+
+        assert_list_equal([list(x) for x in result_bcolz], [[3, 2]])
+
+    def test_groupby_12(self):
+        """
+        test_groupby_12: Groupby's 'sorted_count_distinct', no column provided
+        """
+        random.seed(1)
+
+        groupby_cols = []
+        agg_list = ['f1']
+        num_rows = 10
+
+        # -- Data --
+        data = np.array(
+            [(0, 1),
+             (1, 1),
+             (1, 2),
+             (0, 2),
+             (1, 2),
+             (2, 2),
+             (0, 3),
+             (0, 3),
+             (1, 4)],
+            dtype='i8,i8')
+
+
+        with self.on_disk_data_cleaner(data) as ct:
+            result_bcolz = ct.groupby(groupby_cols, agg_list,
+                                      agg_method='sorted_count_distinct')
+
+        assert_list_equal([list(x) for x in result_bcolz], [[4]])
+
+    def test_groupby_13(self):
+        """
+        test_groupby_13: Groupby's 'sorted_count_distinct', pre-filter
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        agg_list = ['f1']
+
+        # -- Data --
+        data = np.array(
+            [(0, 1),
+             (1, 1),
+             (1, 2),
+             (0, 2),
+             (1, 2),
+             (2, 2),
+             (0, 3),
+             (0, 3),
+             (1, 4)],
+            dtype='i8,i8')
+
+
+        # -- Bcolz --
+        with self.on_disk_data_cleaner(data) as ct:
+            barr = ct.where_terms( [('f0', 'in', [0, 1])] )
+            result_bcolz = ct.groupby(groupby_cols, agg_list,
+                                      bool_arr=barr,
+                                      agg_method='sorted_count_distinct')
+
+        assert_list_equal([list(x) for x in result_bcolz], [[0, 3], [1, 3]])
 
     def _assert_list_equal(self, a, b):
         assert_list_equal(a, b)
