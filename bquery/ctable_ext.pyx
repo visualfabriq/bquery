@@ -1,8 +1,9 @@
 import numpy as np
 import cython
-from numpy cimport ndarray, dtype, npy_intp, npy_int32, npy_uint64, npy_int64, npy_float64
-from libc.stdlib cimport malloc
-from libc.string cimport strcpy
+from numpy cimport ndarray, dtype, npy_intp, npy_int32, npy_uint64, npy_int64, npy_float64, uint64_t
+from libc.stdlib cimport malloc, calloc, free
+from libc.string cimport strcpy, memcpy
+from libcpp.vector cimport vector
 from khash cimport *
 from bcolz.carray_ext cimport carray, chunk
 
@@ -31,12 +32,12 @@ DEF _SORTED_COUNT_DISTINCT = 4
 @cython.boundscheck(False)
 cdef void _factorize_str_helper(Py_ssize_t iter_range,
                        Py_ssize_t allocation_size,
-                       ndarray in_buffer,
-                       ndarray[npy_uint64] out_buffer,
+                       char[:, :] in_buffer,
+                       uint64_t[:] out_buffer,
                        kh_str_t *table,
                        Py_ssize_t * count,
-                       dict reverse,
-                       ):
+                       vector[char *] & reverse_values,
+                       ) nogil:
     cdef:
         Py_ssize_t i, idx
         int ret
@@ -45,10 +46,16 @@ cdef void _factorize_str_helper(Py_ssize_t iter_range,
         khiter_t k
 
     ret = 0
+    # allocate enough memory to hold the string element, add one for the
+    # null byte that marks the end of the string.
+    # TODO: understand why zero-filling is necessary. Without zero-filling
+    # the buffer, duplicate keys occur in the reverse dict
+    element = <char *>calloc(allocation_size, sizeof(char))
 
     for i in range(iter_range):
-        # TODO: Consider indexing directly into the array for efficiency
-        element = in_buffer[i]
+        # strings are stored without null termination in ndarrays: need a 
+        # buffer to append null termination to use usual string algorithms
+        memcpy(element, &(in_buffer[i, 0]), in_buffer.shape[1])
         k = kh_get_str(table, element)
         if k != table.n_buckets:
             idx = table.vals[k]
@@ -60,24 +67,31 @@ cdef void _factorize_str_helper(Py_ssize_t iter_range,
             strcpy(insert, element)
             k = kh_put_str(table, insert, &ret)
             table.vals[k] = idx = count[0]
-            reverse[count[0]] = element
+            reverse_values.push_back(insert)
             count[0] += 1
         out_buffer[i] = idx
+
+    free(element)
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
 def factorize_str(carray carray_, carray labels=None):
     cdef:
         chunk chunk_
-        Py_ssize_t n, i, count, chunklen, leftover_elements
+        Py_ssize_t n, i, count, chunklen, leftover_elements, allocation_size, \
+                   nchunks
+        vector[char *] reverse_values
         dict reverse
         ndarray in_buffer
+        char[:, :] in_buffer_view
         ndarray[npy_uint64] out_buffer
+        uint64_t[:] out_buffer_view
         kh_str_t *table
 
     count = 0
     ret = 0
     reverse = {}
+    nchunks = carray_.nchunks
 
     n = len(carray_)
     chunklen = carray_.chunklen
@@ -85,39 +99,61 @@ def factorize_str(carray carray_, carray labels=None):
         labels = carray([], dtype='int64', expectedlen=n)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
+    # initialise cython typed memoryview to allow indexing directly into array
+    out_buffer_view = out_buffer
     in_buffer = np.empty(chunklen, dtype=carray_.dtype)
     table = kh_init_str()
 
-    for i in range(carray_.nchunks):
-        chunk_ = carray_.chunks[i]
-        # decompress into in_buffer
-        chunk_._getitem(0, chunklen, in_buffer.data)
-        _factorize_str_helper(chunklen,
-                        carray_.dtype.itemsize + 1,
-                        in_buffer,
-                        out_buffer,
-                        table,
-                        &count,
-                        reverse,
-                        )
-        # compress out_buffer into labels
-        labels.append(out_buffer.astype(np.int64))
+    # the uint8 view is a workaround to allow the definition of a reshaped 
+    # cython memoryview on string elements contained in a ndarray. 
+    # This allows convenient indexing in the form var[element no, string pos]
+    in_buffer_view = in_buffer.view('uint8') \
+                              .reshape(chunklen, carray_.dtype.itemsize)
+    allocation_size = in_buffer_view.shape[1] + 1
+    with nogil:
+        for i in xrange(nchunks):
+            with gil:
+                chunk_ = carray_.chunks[i]
+                # decompress into in_buffer
+                # note: _getitem releases gil during blosc decompression
+                chunk_._getitem(0, chunklen, in_buffer.data)
+            _factorize_str_helper(chunklen,
+                            allocation_size,
+                            in_buffer_view,
+                            out_buffer_view,
+                            table,
+                            &count,
+                            reverse_values,
+                            )
+            with gil:
+                # compress out_buffer into labels
+                labels.append(out_buffer.astype(np.int64))
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
+    in_buffer_view = carray_.leftover_array \
+                            .view('uint8') \
+                            .reshape(chunklen, carray_.dtype.itemsize)
     if leftover_elements > 0:
-        _factorize_str_helper(leftover_elements,
-                          carray_.dtype.itemsize + 1,
-                          carray_.leftover_array,
-                          out_buffer,
-                          table,
-                          &count,
-                          reverse,
-                          )
+        with nogil:
+            _factorize_str_helper(leftover_elements,
+                                allocation_size,
+                                in_buffer_view,
+                                out_buffer_view,
+                                table,
+                                &count,
+                                reverse_values,
+                                )
 
     # compress out_buffer into labels
     labels.append(out_buffer[:leftover_elements].astype(np.int64))
 
     kh_destroy_str(table)
+
+    # construct python dict from vectors and
+    # free the memory allocated for the strings in the reverse_values list
+    for i in range(reverse_values.size()):
+        reverse[i] = reverse_values[i]
+        free(reverse_values[i])
 
     return labels, reverse
 

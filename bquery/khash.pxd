@@ -48,9 +48,9 @@ cdef extern from "khash_python.h":
     inline kh_str_t* kh_init_str()
     inline void kh_destroy_str(kh_str_t*)
     inline void kh_clear_str(kh_str_t*)
-    inline khint_t kh_get_str(kh_str_t*, kh_cstr_t)
+    inline khint_t kh_get_str(kh_str_t*, kh_cstr_t) nogil
     inline void kh_resize_str(kh_str_t*, khint_t)
-    inline khint_t kh_put_str(kh_str_t*, kh_cstr_t, int*)
+    inline khint_t kh_put_str(kh_str_t*, kh_cstr_t, int*) nogil
     inline void kh_del_str(kh_str_t*, khint_t)
 
     bint kh_exist_str(kh_str_t*, khiter_t)
