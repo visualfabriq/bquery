@@ -868,6 +868,70 @@ class TestCtable():
         assert_array_equal(fact_1[0][0], fact_2[0][0])
         assert_array_equal(fact_1[1][0], fact_2[1][0])
 
+    def test_pos_basket_01(self):
+        """test_pos_basket_01:
+
+             <----- data ----->
+            | Basket | Product | Filter | Result |
+            |--------|---------|--------|--------|
+            | 1      | A       | 0      | 1      |
+            | 1      | B       | 1      | 1      |
+            | 1      | C       | 0      | 1      |
+            | 2      | A       | 0      | 1      |
+            | 2      | B       | 1      | 1      |
+            | 3      | A       | 0      | 0      |
+            | 4      | A       | 0      | 0      |
+            | 4      | C       | 0      | 0      |
+            | 5      | B       | 1      | 1      |
+            | 6      | A       | 0      | 1      |
+            | 6      | B       | 1      | 1      |
+            | 6      | C       | 0      | 1      |
+            | 7      | B       | 1      | 1      |
+            | 7      | B       | 1      | 1      |
+            | 7      | B       | 1      | 1      |
+            | 8      | B       | 1      | 1      |
+            | 9      | C       | 0      | 0      |
+
+        """
+
+        # -- Data --
+        data = np.array(
+            [(1, 0),
+             (1, 1),
+             (1, 2),
+             (2, 0),
+             (2, 1),
+             (3, 0),
+             (4, 0),
+             (4, 2),
+             (5, 1),
+             (6, 0),
+             (6, 1),
+             (6, 2),
+             (7, 1),
+             (7, 1),
+             (7, 1),
+             (8, 1),
+             (9, 2),
+             ],
+            dtype='i8,i8')
+
+        # -- Bcolz --
+        with self.on_disk_data_cleaner(data) as ct:
+            f1 = ct['f1']
+            barr = bz.eval("f1 == 1")  # filter
+            result = ct.is_in_ordered_subgroups(basket_col='f0', bool_arr=barr)
+
+        assert_list_equal(list(barr[:]),
+                          [False, True, False, False, True, False, False, False,
+                           True, False, True, False, True, True, True, True,
+                           False])
+
+        assert_list_equal(list(result[:]),
+                          [True, True, True, True, True, False, False, False,
+                           True, True, True, True, True, True, True, True,
+                           False])
+
 
 if __name__ == '__main__':
     nose.main()
