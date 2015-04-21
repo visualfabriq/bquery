@@ -483,3 +483,15 @@ class ctable(bcolz.ctable):
             boolarr = bcolz.carray(boolarr)
 
         return boolarr
+
+    def is_in_ordered_subgroups(self, basket_col=None, bool_arr=None):
+        """"""
+        assert basket_col is not None
+
+        if bool_arr is None:
+            bool_arr = bcolz.ones(self.len)
+
+        return \
+            ctable_ext.is_in_ordered_subgroups(
+                self[basket_col], bool_arr=bool_arr)
+

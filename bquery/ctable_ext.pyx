@@ -1,10 +1,16 @@
 import numpy as np
+from numpy cimport ndarray, dtype, npy_intp, npy_int32, \
+    npy_uint64, npy_int64, npy_float64, npy_bool
+
 import cython
-from numpy cimport ndarray, dtype, npy_intp, npy_int32, npy_uint64, npy_int64, npy_float64
+import bcolz as bz
+from bcolz.carray_ext cimport carray, chunk
+
+import itertools as itt
+
 from libc.stdlib cimport malloc
 from libc.string cimport strcpy
 from khash cimport *
-from bcolz.carray_ext cimport carray, chunk
 
 # ----------------------------------------------------------------------------
 #                        GLOBAL DEFINITIONS
@@ -1130,6 +1136,66 @@ cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_
         np.delete(out_buffer, skip_key)
 
     return out_buffer
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef is_in_ordered_subgroups(carray groups_col, carray bool_arr=None):
+    """
+    Mark whole basket containing certain items
+
+    :param groups_col: carray containing ordered groups
+    :param bool_arr: bool array showing if an desired item is present
+    :return: bool array marking the whole group as True if item found
+    """
+    cdef:
+        npy_int64 previous_item
+        npy_int64 actual_item
+        Py_ssize_t blen
+        Py_ssize_t len_subgroup = 0
+        Py_ssize_t n
+        npy_bool is_in = False
+        carray ret
+        ndarray x
+        ndarray bl_basket, bl_bool_arr
+
+    ret = bz.zeros(0, dtype='bool', expectedlen=groups_col.len)
+    blen = min([groups_col.chunklen, bool_arr.chunklen])
+    previous_item = groups_col[0]
+
+    for bl_basket, bl_bool_arr in itt.izip(
+            bz.iterblocks(groups_col, blen=blen),
+            bz.iterblocks(bool_arr, blen=blen)):
+
+        for n in range(len(bl_basket)):
+
+            actual_item = bl_basket[n]
+
+            if previous_item != actual_item:
+                if is_in:
+                    x = np.ones(len_subgroup, dtype='bool')
+                else:
+                    x = np.zeros(len_subgroup, dtype='bool')
+                ret.append(x)
+                # - reset vars -
+                is_in = False
+                len_subgroup = 0
+
+            if bl_bool_arr[n]:
+                is_in = True
+
+            len_subgroup += 1
+            previous_item = actual_item
+
+    if is_in:
+        x = np.ones(len_subgroup, dtype='bool')
+    else:
+        x = np.zeros(len_subgroup, dtype='bool')
+
+    ret.append(x)
+
+    return ret
+
 
 # ---------------------------------------------------------------------------
 # Temporary Section
