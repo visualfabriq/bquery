@@ -484,7 +484,8 @@ class ctable(bcolz.ctable):
 
         return boolarr
 
-    def is_in_ordered_subgroups(self, basket_col=None, bool_arr=None):
+    def is_in_ordered_subgroups(self, basket_col=None, bool_arr=None,
+                                _max_len_subgroup=1000):
         """"""
         assert basket_col is not None
 
@@ -493,5 +494,6 @@ class ctable(bcolz.ctable):
 
         return \
             ctable_ext.is_in_ordered_subgroups(
-                self[basket_col], bool_arr=bool_arr)
+                self[basket_col], bool_arr=bool_arr,
+                _max_len_subgroup=_max_len_subgroup)
 
