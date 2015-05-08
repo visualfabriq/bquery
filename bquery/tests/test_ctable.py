@@ -920,7 +920,8 @@ class TestCtable():
         with self.on_disk_data_cleaner(data) as ct:
             f1 = ct['f1']
             barr = bz.eval("f1 == 1")  # filter
-            result = ct.is_in_ordered_subgroups(basket_col='f0', bool_arr=barr)
+            result = ct.is_in_ordered_subgroups(basket_col='f0', bool_arr=barr,
+                                                _max_len_subgroup=1)
 
         assert_list_equal(list(barr[:]),
                           [False, True, False, False, True, False, False, False,
