@@ -233,6 +233,21 @@ class ctable(bcolz.ctable):
         return ct_agg
 
     # groupby helper functions
+    def helper_factorize_groupby_cols(self, col):
+        if self.cache_valid(col):
+                col_rootdir = self[col].rootdir
+                col_factor_rootdir = col_rootdir + '.factor'
+                col_values_rootdir = col_rootdir + '.values'
+                col_factor_carray = bcolz.carray(rootdir=col_factor_rootdir,
+                                                 mode='r')
+                col_values_carray = bcolz.carray(rootdir=col_values_rootdir,
+                                                 mode='r')
+        else:
+            col_factor_carray, values = ctable_ext.factorize(self[col])
+            col_values_carray = \
+                bcolz.carray(values.values(), dtype=self[col].dtype)
+        return col_factor_carray, col_values_carray
+
     def factorize_groupby_cols(self, groupby_cols):
         """
 
@@ -242,23 +257,19 @@ class ctable(bcolz.ctable):
         # unless we need to refresh the cache
         factor_list = []
         values_list = []
+        results = []
 
         # factorize the groupby columns
+        pool = ThreadPool(processes=NUM_PROC)
+
         for col in groupby_cols:
+            results.append(pool.apply_async(self.helper_factorize_groupby_cols,
+                                            args=(col, )))
 
-            if self.cache_valid(col):
-                col_rootdir = self[col].rootdir
-                col_factor_rootdir = col_rootdir + '.factor'
-                col_values_rootdir = col_rootdir + '.values'
-                col_factor_carray = \
-                    bcolz.carray(rootdir=col_factor_rootdir, mode='r')
-                col_values_carray = \
-                    bcolz.carray(rootdir=col_values_rootdir, mode='r')
-            else:
-                col_factor_carray, values = ctable_ext.factorize(self[col])
-                col_values_carray = \
-                    bcolz.carray(values.values(), dtype=self[col].dtype)
-
+        for r in results:
+            _r = r.get()
+            col_factor_carray = _r[0]
+            col_values_carray = _r[1]
             factor_list.append(col_factor_carray)
             values_list.append(col_values_carray)
 
