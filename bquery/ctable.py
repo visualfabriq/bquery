@@ -2,12 +2,17 @@
 import ctable_ext
 
 # external imports
+from multiprocessing.pool import ThreadPool
+from multiprocessing import cpu_count
 import numpy as np
 import bcolz
 from collections import namedtuple
 import os
 from bquery.ctable_ext import \
     SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
+
+
+NUM_PROC = cpu_count()
 
 
 class ctable(bcolz.ctable):
