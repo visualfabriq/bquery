@@ -115,35 +115,49 @@ class ctable(bcolz.ctable):
 
         return output
 
+    def helper_agg_groups_by_iter(self, ct_agg=None, col=None, factor_carray=None, nr_groups=None,
+            skip_key=None, agg_method=None):
+        # TODO: input vs output column
+        col_dtype = ct_agg[col].dtype
+
+        if col_dtype == np.float64:
+            r = ctable_ext.sum_float64(self[col], factor_carray, nr_groups,
+                                       skip_key, agg_method=agg_method)
+        elif col_dtype == np.int64:
+            r = ctable_ext.sum_int64(self[col], factor_carray, nr_groups,
+                                     skip_key, agg_method=agg_method)
+        elif col_dtype == np.int32:
+            r = ctable_ext.sum_int32(self[col], factor_carray, nr_groups,
+                                     skip_key, agg_method=agg_method)
+        else:
+            raise NotImplementedError(
+                'Column dtype ({0}) not supported for aggregation yet '
+                '(only int32, int64 & float64)'.format(str(col_dtype)))
+
+        return r
+
     def agg_groups_by_iter(self, ct_agg, nr_groups, skip_key,
-                                   factor_carray, groupby_cols, output_agg_ops,
-                                   bool_arr=None,
-                                   agg_method=ctable_ext.SUM):
+                           factor_carray, groupby_cols, output_agg_ops,
+                           bool_arr=None,
+                           agg_method=ctable_ext.SUM):
         total = []
+        results = []
+        pool = ThreadPool(processes=NUM_PROC)
 
         for col in groupby_cols:
             total.append(ctable_ext.groupby_value(self[col], factor_carray,
                                                   nr_groups, skip_key))
 
         for col, agg_op in output_agg_ops:
-            # TODO: input vs output column
-            col_dtype = ct_agg[col].dtype
+            kwds = {"ct_agg": ct_agg, "col": col,
+                    "factor_carray": factor_carray,
+                    "nr_groups": nr_groups, "skip_key": skip_key,
+                    "agg_method": agg_method}
+            results.append(pool.apply_async(self.helper_agg_groups_by_iter,
+                                            kwds=kwds))
 
-            if col_dtype == np.float64:
-                r = ctable_ext.sum_float64(self[col], factor_carray, nr_groups,
-                                           skip_key, agg_method=agg_method)
-            elif col_dtype == np.int64:
-                r = ctable_ext.sum_int64(self[col], factor_carray, nr_groups,
-                                         skip_key, agg_method=agg_method)
-            elif col_dtype == np.int32:
-                r = ctable_ext.sum_int32(self[col], factor_carray, nr_groups,
-                                         skip_key, agg_method=agg_method)
-            else:
-                raise NotImplementedError(
-                    'Column dtype ({0}) not supported for aggregation yet '
-                    '(only int32, int64 & float64)'.format(str(col_dtype)))
-
-            total.append(r)
+        for r in results:
+            total.append(r.get())
 
         # TODO: fix ugly fix?
         if bool_arr is not None:
