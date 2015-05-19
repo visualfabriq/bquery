@@ -1,6 +1,6 @@
 import numpy as np
 from numpy cimport ndarray, dtype, npy_intp, npy_int32, \
-    npy_uint64, npy_int64, npy_float64, npy_bool
+    npy_uint64, npy_int64, npy_float64, npy_bool, uint64_t
 
 import cython
 import bcolz as bz
@@ -10,6 +10,7 @@ import itertools as itt
 
 from libc.stdlib cimport malloc
 from libc.string cimport strcpy
+from libcpp.vector cimport vector
 from khash cimport *
 
 # ----------------------------------------------------------------------------
