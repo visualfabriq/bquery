@@ -1,6 +1,6 @@
 import numpy as np
 from numpy cimport ndarray, dtype, npy_intp, npy_int32, \
-    npy_uint64, npy_int64, npy_float64, npy_bool
+    npy_uint64, npy_int64, npy_float64, npy_bool, uint64_t
 
 import cython
 import bcolz as bz
@@ -10,6 +10,7 @@ import itertools as itt
 
 from libc.stdlib cimport malloc
 from libc.string cimport strcpy
+from libcpp.vector cimport vector
 from khash cimport *
 
 # ----------------------------------------------------------------------------
@@ -112,13 +113,12 @@ def factorize_str(carray carray_, carray labels=None):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_int64_helper(Py_ssize_t iter_range,
-                       Py_ssize_t allocation_size,
-                       ndarray[npy_int64] in_buffer,
-                       ndarray[npy_uint64] out_buffer,
+                       npy_int64[:] in_buffer,
+                       uint64_t[:] out_buffer,
                        kh_int64_t *table,
                        Py_ssize_t * count,
-                       dict reverse,
-                       ):
+                       vector[npy_int64] & reverse_values,
+                       ) nogil:
     cdef:
         Py_ssize_t i, idx
         int ret
@@ -136,7 +136,7 @@ cdef void _factorize_int64_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_int64(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse[count[0]] = element
+            reverse_values.push_back(element)
             count[0] += 1
         out_buffer[i] = idx
 
@@ -144,11 +144,14 @@ cdef void _factorize_int64_helper(Py_ssize_t iter_range,
 @cython.boundscheck(False)
 def factorize_int64(carray carray_, carray labels=None):
     cdef:
-        Py_ssize_t len_carray, count, chunklen, len_in_buffer
+        Py_ssize_t len_carray, count, chunklen, len_in_buffer, i
         dict reverse
         ndarray[npy_int64] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_int64_t *table
+        vector[npy_int64] reverse_values
+        npy_int64[:] in_buffer_view
+        uint64_t[:] out_buffer_view
 
     count = 0
     ret = 0
@@ -160,35 +163,40 @@ def factorize_int64(carray carray_, carray labels=None):
         labels = carray([], dtype='int64', expectedlen=len_carray)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
+    out_buffer_view = out_buffer
     table = kh_init_int64()
 
     for in_buffer in bz.iterblocks(carray_):
         len_in_buffer = len(in_buffer)
+        in_buffer_view = in_buffer
         _factorize_int64_helper(len_in_buffer,
-                        carray_.dtype.itemsize + 1,
-                        in_buffer,
-                        out_buffer,
+                        in_buffer_view,
+                        out_buffer_view,
                         table,
                         &count,
-                        reverse,
+                        reverse_values
                         )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
     kh_destroy_int64(table)
 
+    # TODO: many thanks https://github.com/visualfabriq/bquery/pull/21
+    # # construct python dict from vectors
+    for i in range(reverse_values.size()):
+        reverse[i] = reverse_values[i]
+
     return labels, reverse
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_int32_helper(Py_ssize_t iter_range,
-                       Py_ssize_t allocation_size,
-                       ndarray[npy_int32] in_buffer,
-                       ndarray[npy_uint64] out_buffer,
+                       npy_int32[:] in_buffer,
+                       uint64_t[:] out_buffer,
                        kh_int32_t *table,
                        Py_ssize_t * count,
-                       dict reverse,
-                       ):
+                       vector[npy_int32] & reverse_values,
+                       ) nogil:
     cdef:
         Py_ssize_t i, idx
         int ret
@@ -206,7 +214,7 @@ cdef void _factorize_int32_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_int32(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse[count[0]] = element
+            reverse_values.push_back(element)
             count[0] += 1
         out_buffer[i] = idx
 
@@ -214,11 +222,14 @@ cdef void _factorize_int32_helper(Py_ssize_t iter_range,
 @cython.boundscheck(False)
 def factorize_int32(carray carray_, carray labels=None):
     cdef:
-        Py_ssize_t len_carray, count, chunklen, len_in_buffer
+        Py_ssize_t len_carray, count, chunklen, len_in_buffer, i
         dict reverse
         ndarray[npy_int32] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_int32_t *table
+        vector[npy_int32] reverse_values
+        npy_int32[:] in_buffer_view
+        uint64_t[:] out_buffer_view
 
     count = 0
     ret = 0
@@ -230,35 +241,40 @@ def factorize_int32(carray carray_, carray labels=None):
         labels = carray([], dtype='int64', expectedlen=len_carray)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
+    out_buffer_view = out_buffer
     table = kh_init_int32()
 
     for in_buffer in bz.iterblocks(carray_):
         len_in_buffer = len(in_buffer)
+        in_buffer_view = in_buffer
         _factorize_int32_helper(len_in_buffer,
-                        carray_.dtype.itemsize + 1,
-                        in_buffer,
-                        out_buffer,
+                        in_buffer_view,
+                        out_buffer_view,
                         table,
                         &count,
-                        reverse,
+                        reverse_values
                         )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
     kh_destroy_int32(table)
 
+    # TODO: many thanks https://github.com/visualfabriq/bquery/pull/21
+    # # construct python dict from vectors
+    for i in range(reverse_values.size()):
+        reverse[i] = reverse_values[i]
+
     return labels, reverse
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_float64_helper(Py_ssize_t iter_range,
-                       Py_ssize_t allocation_size,
-                       ndarray[npy_float64] in_buffer,
-                       ndarray[npy_uint64] out_buffer,
+                       npy_float64[:] in_buffer,
+                       uint64_t[:] out_buffer,
                        kh_float64_t *table,
                        Py_ssize_t * count,
-                       dict reverse,
-                       ):
+                       vector[npy_float64] & reverse_values,
+                       ) nogil:
     cdef:
         Py_ssize_t i, idx
         int ret
@@ -276,7 +292,7 @@ cdef void _factorize_float64_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_float64(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse[count[0]] = element
+            reverse_values.push_back(element)
             count[0] += 1
         out_buffer[i] = idx
 
@@ -284,11 +300,14 @@ cdef void _factorize_float64_helper(Py_ssize_t iter_range,
 @cython.boundscheck(False)
 def factorize_float64(carray carray_, carray labels=None):
     cdef:
-        Py_ssize_t len_carray, count, chunklen, len_in_buffer
+        Py_ssize_t len_carray, count, chunklen, len_in_buffer, i
         dict reverse
         ndarray[npy_float64] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_float64_t *table
+        vector[npy_float64] reverse_values
+        npy_float64[:] in_buffer_view
+        uint64_t[:] out_buffer_view
 
     count = 0
     ret = 0
@@ -300,22 +319,28 @@ def factorize_float64(carray carray_, carray labels=None):
         labels = carray([], dtype='int64', expectedlen=len_carray)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
+    out_buffer_view = out_buffer
     table = kh_init_float64()
 
     for in_buffer in bz.iterblocks(carray_):
         len_in_buffer = len(in_buffer)
+        in_buffer_view = in_buffer
         _factorize_float64_helper(len_in_buffer,
-                        carray_.dtype.itemsize + 1,
-                        in_buffer,
-                        out_buffer,
+                        in_buffer_view,
+                        out_buffer_view,
                         table,
                         &count,
-                        reverse,
+                        reverse_values
                         )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
     kh_destroy_float64(table)
+
+    # TODO: many thanks https://github.com/visualfabriq/bquery/pull/21
+    # # construct python dict from vectors
+    for i in range(reverse_values.size()):
+        reverse[i] = reverse_values[i]
 
     return labels, reverse
 
