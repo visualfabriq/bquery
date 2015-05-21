@@ -117,7 +117,6 @@ cdef void _factorize_int64_helper(Py_ssize_t iter_range,
                        uint64_t[:] out_buffer,
                        kh_int64_t *table,
                        Py_ssize_t * count,
-                       vector[npy_int64] & reverse_values,
                        ) nogil:
     cdef:
         Py_ssize_t i, idx
@@ -136,7 +135,6 @@ cdef void _factorize_int64_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_int64(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse_values.push_back(element)
             count[0] += 1
         out_buffer[i] = idx
 
@@ -149,7 +147,6 @@ def factorize_int64(carray carray_, carray labels=None):
         ndarray[npy_int64] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_int64_t *table
-        vector[npy_int64] reverse_values
         npy_int64[:] in_buffer_view
         uint64_t[:] out_buffer_view
 
@@ -173,18 +170,18 @@ def factorize_int64(carray carray_, carray labels=None):
                         in_buffer_view,
                         out_buffer_view,
                         table,
-                        &count,
-                        reverse_values
+                        &count
                         )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
-    kh_destroy_int64(table)
-
     # TODO: many thanks https://github.com/visualfabriq/bquery/pull/21
-    # # construct python dict from vectors
-    for i in range(reverse_values.size()):
-        reverse[i] = reverse_values[i]
+    # construct python dict from vectors and free element memory
+    for i in range(table.n_buckets):
+        if not kh_exist_int64(table, i):   # adjust function name to hash-table data-type
+            continue
+        reverse[table.vals[i]] = table.keys[i]
+    kh_destroy_int64(table)
 
     return labels, reverse
 
@@ -195,7 +192,6 @@ cdef void _factorize_int32_helper(Py_ssize_t iter_range,
                        uint64_t[:] out_buffer,
                        kh_int32_t *table,
                        Py_ssize_t * count,
-                       vector[npy_int32] & reverse_values,
                        ) nogil:
     cdef:
         Py_ssize_t i, idx
@@ -214,7 +210,6 @@ cdef void _factorize_int32_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_int32(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse_values.push_back(element)
             count[0] += 1
         out_buffer[i] = idx
 
@@ -227,7 +222,6 @@ def factorize_int32(carray carray_, carray labels=None):
         ndarray[npy_int32] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_int32_t *table
-        vector[npy_int32] reverse_values
         npy_int32[:] in_buffer_view
         uint64_t[:] out_buffer_view
 
@@ -251,18 +245,18 @@ def factorize_int32(carray carray_, carray labels=None):
                         in_buffer_view,
                         out_buffer_view,
                         table,
-                        &count,
-                        reverse_values
+                        &count
                         )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
-    kh_destroy_int32(table)
-
     # TODO: many thanks https://github.com/visualfabriq/bquery/pull/21
-    # # construct python dict from vectors
-    for i in range(reverse_values.size()):
-        reverse[i] = reverse_values[i]
+    # construct python dict from vectors and free element memory
+    for i in range(table.n_buckets):
+        if not kh_exist_int32(table, i):   # adjust function name to hash-table data-type
+            continue
+        reverse[table.vals[i]] = table.keys[i]
+    kh_destroy_int32(table)
 
     return labels, reverse
 
@@ -273,7 +267,6 @@ cdef void _factorize_float64_helper(Py_ssize_t iter_range,
                        uint64_t[:] out_buffer,
                        kh_float64_t *table,
                        Py_ssize_t * count,
-                       vector[npy_float64] & reverse_values,
                        ) nogil:
     cdef:
         Py_ssize_t i, idx
@@ -292,7 +285,6 @@ cdef void _factorize_float64_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_float64(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse_values.push_back(element)
             count[0] += 1
         out_buffer[i] = idx
 
@@ -305,7 +297,6 @@ def factorize_float64(carray carray_, carray labels=None):
         ndarray[npy_float64] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_float64_t *table
-        vector[npy_float64] reverse_values
         npy_float64[:] in_buffer_view
         uint64_t[:] out_buffer_view
 
@@ -329,18 +320,18 @@ def factorize_float64(carray carray_, carray labels=None):
                         in_buffer_view,
                         out_buffer_view,
                         table,
-                        &count,
-                        reverse_values
+                        &count
                         )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
-    kh_destroy_float64(table)
-
     # TODO: many thanks https://github.com/visualfabriq/bquery/pull/21
-    # # construct python dict from vectors
-    for i in range(reverse_values.size()):
-        reverse[i] = reverse_values[i]
+    # construct python dict from vectors and free element memory
+    for i in range(table.n_buckets):
+        if not kh_exist_float64(table, i):   # adjust function name to hash-table data-type
+            continue
+        reverse[table.vals[i]] = table.keys[i]
+    kh_destroy_float64(table)
 
     return labels, reverse
 

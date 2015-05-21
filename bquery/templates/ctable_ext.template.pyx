@@ -118,7 +118,6 @@ cdef void _factorize_{{ factor_type }}_helper(Py_ssize_t iter_range,
                        uint64_t[:] out_buffer,
                        kh_{{ factor_type }}_t *table,
                        Py_ssize_t * count,
-                       vector[npy_{{ factor_type }}] & reverse_values,
                        ) nogil:
     cdef:
         Py_ssize_t i, idx
@@ -137,7 +136,6 @@ cdef void _factorize_{{ factor_type }}_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_{{ factor_type }}(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse_values.push_back(element)
             count[0] += 1
         out_buffer[i] = idx
 
@@ -150,7 +148,6 @@ def factorize_{{ factor_type }}(carray carray_, carray labels=None):
         ndarray[npy_{{ factor_type }}] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_{{ factor_type }}_t *table
-        vector[npy_{{ factor_type }}] reverse_values
         npy_{{ factor_type }}[:] in_buffer_view
         uint64_t[:] out_buffer_view
 
@@ -174,18 +171,18 @@ def factorize_{{ factor_type }}(carray carray_, carray labels=None):
                         in_buffer_view,
                         out_buffer_view,
                         table,
-                        &count,
-                        reverse_values
+                        &count
                         )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
-    kh_destroy_{{ factor_type }}(table)
-
     # TODO: many thanks https://github.com/visualfabriq/bquery/pull/21
-    # # construct python dict from vectors
-    for i in range(reverse_values.size()):
-        reverse[i] = reverse_values[i]
+    # construct python dict from vectors and free element memory
+    for i in range(table.n_buckets):
+        if not kh_exist_{{ factor_type }}(table, i):   # adjust function name to hash-table data-type
+            continue
+        reverse[table.vals[i]] = table.keys[i]
+    kh_destroy_{{ factor_type }}(table)
 
     return labels, reverse
 
