@@ -187,24 +187,26 @@ def factorize_int64(carray carray_, carray labels=None):
         # decompress into in_buffer
         chunk_._getitem(0, chunklen, in_buffer.data)
         in_buffer_view = in_buffer
-        _factorize_int64_helper(chunklen,
-                in_buffer_view,
-                out_buffer_view,
-                table,
-                &count
-                )
+        with nogil:
+            _factorize_int64_helper(chunklen,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
         # compress out_buffer into labels
         labels.append(out_buffer.astype(np.int64))
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
         in_buffer_view = carray_.leftover_array
-        _factorize_int64_helper(leftover_elements,
-                in_buffer_view,
-                out_buffer_view,
-                table,
-                &count
-                )
+        with nogil:
+            _factorize_int64_helper(leftover_elements,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
 
     # compress out_buffer into labels
     labels.append(out_buffer[:leftover_elements].astype(np.int64))
@@ -277,24 +279,26 @@ def factorize_int32(carray carray_, carray labels=None):
         # decompress into in_buffer
         chunk_._getitem(0, chunklen, in_buffer.data)
         in_buffer_view = in_buffer
-        _factorize_int32_helper(chunklen,
-                in_buffer_view,
-                out_buffer_view,
-                table,
-                &count
-                )
+        with nogil:
+            _factorize_int32_helper(chunklen,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
         # compress out_buffer into labels
         labels.append(out_buffer.astype(np.int64))
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
         in_buffer_view = carray_.leftover_array
-        _factorize_int32_helper(leftover_elements,
-                in_buffer_view,
-                out_buffer_view,
-                table,
-                &count
-                )
+        with nogil:
+            _factorize_int32_helper(leftover_elements,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
 
     # compress out_buffer into labels
     labels.append(out_buffer[:leftover_elements].astype(np.int64))
@@ -367,24 +371,26 @@ def factorize_float64(carray carray_, carray labels=None):
         # decompress into in_buffer
         chunk_._getitem(0, chunklen, in_buffer.data)
         in_buffer_view = in_buffer
-        _factorize_float64_helper(chunklen,
-                in_buffer_view,
-                out_buffer_view,
-                table,
-                &count
-                )
+        with nogil:
+            _factorize_float64_helper(chunklen,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
         # compress out_buffer into labels
         labels.append(out_buffer.astype(np.int64))
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
         in_buffer_view = carray_.leftover_array
-        _factorize_float64_helper(leftover_elements,
-                in_buffer_view,
-                out_buffer_view,
-                table,
-                &count
-                )
+        with nogil:
+            _factorize_float64_helper(leftover_elements,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
 
     # compress out_buffer into labels
     labels.append(out_buffer[:leftover_elements].astype(np.int64))

@@ -188,24 +188,26 @@ def factorize_{{ factor_type }}(carray carray_, carray labels=None):
         # decompress into in_buffer
         chunk_._getitem(0, chunklen, in_buffer.data)
         in_buffer_view = in_buffer
-        _factorize_{{ factor_type }}_helper(chunklen,
-                in_buffer_view,
-                out_buffer_view,
-                table,
-                &count
-                )
+        with nogil:
+            _factorize_{{ factor_type }}_helper(chunklen,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
         # compress out_buffer into labels
         labels.append(out_buffer.astype(np.int64))
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
         in_buffer_view = carray_.leftover_array
-        _factorize_{{ factor_type }}_helper(leftover_elements,
-                in_buffer_view,
-                out_buffer_view,
-                table,
-                &count
-                )
+        with nogil:
+            _factorize_{{ factor_type }}_helper(leftover_elements,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
 
     # compress out_buffer into labels
     labels.append(out_buffer[:leftover_elements].astype(np.int64))
