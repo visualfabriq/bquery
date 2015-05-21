@@ -65,9 +65,9 @@ cdef extern from "khash_python.h":
     inline kh_int64_t* kh_init_int64()
     inline void kh_destroy_int64(kh_int64_t*)
     inline void kh_clear_int64(kh_int64_t*)
-    inline khint_t kh_get_int64(kh_int64_t*, int64_t)
+    inline khint_t kh_get_int64(kh_int64_t*, int64_t) nogil
     inline void kh_resize_int64(kh_int64_t*, khint_t)
-    inline khint_t kh_put_int64(kh_int64_t*, int64_t, int*)
+    inline khint_t kh_put_int64(kh_int64_t*, int64_t, int*) nogil
     inline void kh_del_int64(kh_int64_t*, khint_t)
 
     bint kh_exist_int64(kh_int64_t*, khiter_t)
@@ -81,9 +81,9 @@ cdef extern from "khash_python.h":
     inline kh_float64_t* kh_init_float64()
     inline void kh_destroy_float64(kh_float64_t*)
     inline void kh_clear_float64(kh_float64_t*)
-    inline khint_t kh_get_float64(kh_float64_t*, float64_t)
+    inline khint_t kh_get_float64(kh_float64_t*, float64_t) nogil
     inline void kh_resize_float64(kh_float64_t*, khint_t)
-    inline khint_t kh_put_float64(kh_float64_t*, float64_t, int*)
+    inline khint_t kh_put_float64(kh_float64_t*, float64_t, int*) nogil
     inline void kh_del_float64(kh_float64_t*, khint_t)
 
     bint kh_exist_float64(kh_float64_t*, khiter_t)
@@ -97,9 +97,9 @@ cdef extern from "khash_python.h":
     inline kh_int32_t* kh_init_int32()
     inline void kh_destroy_int32(kh_int32_t*)
     inline void kh_clear_int32(kh_int32_t*)
-    inline khint_t kh_get_int32(kh_int32_t*, int32_t)
+    inline khint_t kh_get_int32(kh_int32_t*, int32_t) nogil
     inline void kh_resize_int32(kh_int32_t*, khint_t)
-    inline khint_t kh_put_int32(kh_int32_t*, int32_t, int*)
+    inline khint_t kh_put_int32(kh_int32_t*, int32_t, int*) nogil
     inline void kh_del_int32(kh_int32_t*, khint_t)
 
     bint kh_exist_int32(kh_int32_t*, khiter_t)
