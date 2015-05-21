@@ -1,6 +1,6 @@
 import numpy as np
 from numpy cimport ndarray, dtype, npy_intp, npy_int32, \
-    npy_uint64, npy_int64, npy_float64, npy_bool
+    npy_uint64, npy_int64, npy_float64, npy_bool, uint64_t
 
 import cython
 import bcolz as bz
@@ -130,13 +130,11 @@ def factorize_str(carray carray_, carray labels=None):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_int64_helper(Py_ssize_t iter_range,
-                       Py_ssize_t allocation_size,
-                       ndarray[npy_int64] in_buffer,
-                       ndarray[npy_uint64] out_buffer,
+                       npy_int64[:] in_buffer,
+                       uint64_t[:] out_buffer,
                        kh_int64_t *table,
                        Py_ssize_t * count,
-                       dict reverse,
-                       ):
+                       ) nogil:
     cdef:
         Py_ssize_t i, idx
         int ret
@@ -154,7 +152,6 @@ cdef void _factorize_int64_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_int64(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse[count[0]] = element
             count[0] += 1
         out_buffer[i] = idx
 
@@ -168,6 +165,8 @@ def factorize_int64(carray carray_, carray labels=None):
         ndarray[npy_int64] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_int64_t *table
+        npy_int64[:] in_buffer_view
+        uint64_t[:] out_buffer_view
 
     count = 0
     ret = 0
@@ -179,6 +178,7 @@ def factorize_int64(carray carray_, carray labels=None):
         labels = carray([], dtype='int64', expectedlen=n)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
+    out_buffer_view = out_buffer
     in_buffer = np.empty(chunklen, dtype='int64')
     table = kh_init_int64()
 
@@ -186,31 +186,33 @@ def factorize_int64(carray carray_, carray labels=None):
         chunk_ = carray_.chunks[i]
         # decompress into in_buffer
         chunk_._getitem(0, chunklen, in_buffer.data)
+        in_buffer_view = in_buffer
         _factorize_int64_helper(chunklen,
-                        carray_.dtype.itemsize + 1,
-                        in_buffer,
-                        out_buffer,
-                        table,
-                        &count,
-                        reverse,
-                        )
+                in_buffer_view,
+                out_buffer_view,
+                table,
+                &count
+                )
         # compress out_buffer into labels
         labels.append(out_buffer.astype(np.int64))
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
+        in_buffer_view = carray_.leftover_array
         _factorize_int64_helper(leftover_elements,
-                          carray_.dtype.itemsize + 1,
-                          carray_.leftover_array,
-                          out_buffer,
-                          table,
-                          &count,
-                          reverse,
-                          )
+                in_buffer_view,
+                out_buffer_view,
+                table,
+                &count
+                )
 
     # compress out_buffer into labels
     labels.append(out_buffer[:leftover_elements].astype(np.int64))
 
+    for i in range(table.n_buckets):
+        if not kh_exist_int64(table, i):   # adjust function name to hash-table data-type
+            continue
+        reverse[table.vals[i]] = table.keys[i]
     kh_destroy_int64(table)
 
     return labels, reverse
@@ -218,13 +220,11 @@ def factorize_int64(carray carray_, carray labels=None):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_int32_helper(Py_ssize_t iter_range,
-                       Py_ssize_t allocation_size,
-                       ndarray[npy_int32] in_buffer,
-                       ndarray[npy_uint64] out_buffer,
+                       npy_int32[:] in_buffer,
+                       uint64_t[:] out_buffer,
                        kh_int32_t *table,
                        Py_ssize_t * count,
-                       dict reverse,
-                       ):
+                       ) nogil:
     cdef:
         Py_ssize_t i, idx
         int ret
@@ -242,7 +242,6 @@ cdef void _factorize_int32_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_int32(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse[count[0]] = element
             count[0] += 1
         out_buffer[i] = idx
 
@@ -256,6 +255,8 @@ def factorize_int32(carray carray_, carray labels=None):
         ndarray[npy_int32] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_int32_t *table
+        npy_int32[:] in_buffer_view
+        uint64_t[:] out_buffer_view
 
     count = 0
     ret = 0
@@ -267,6 +268,7 @@ def factorize_int32(carray carray_, carray labels=None):
         labels = carray([], dtype='int64', expectedlen=n)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
+    out_buffer_view = out_buffer
     in_buffer = np.empty(chunklen, dtype='int32')
     table = kh_init_int32()
 
@@ -274,31 +276,33 @@ def factorize_int32(carray carray_, carray labels=None):
         chunk_ = carray_.chunks[i]
         # decompress into in_buffer
         chunk_._getitem(0, chunklen, in_buffer.data)
+        in_buffer_view = in_buffer
         _factorize_int32_helper(chunklen,
-                        carray_.dtype.itemsize + 1,
-                        in_buffer,
-                        out_buffer,
-                        table,
-                        &count,
-                        reverse,
-                        )
+                in_buffer_view,
+                out_buffer_view,
+                table,
+                &count
+                )
         # compress out_buffer into labels
         labels.append(out_buffer.astype(np.int64))
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
+        in_buffer_view = carray_.leftover_array
         _factorize_int32_helper(leftover_elements,
-                          carray_.dtype.itemsize + 1,
-                          carray_.leftover_array,
-                          out_buffer,
-                          table,
-                          &count,
-                          reverse,
-                          )
+                in_buffer_view,
+                out_buffer_view,
+                table,
+                &count
+                )
 
     # compress out_buffer into labels
     labels.append(out_buffer[:leftover_elements].astype(np.int64))
 
+    for i in range(table.n_buckets):
+        if not kh_exist_int32(table, i):   # adjust function name to hash-table data-type
+            continue
+        reverse[table.vals[i]] = table.keys[i]
     kh_destroy_int32(table)
 
     return labels, reverse
@@ -306,13 +310,11 @@ def factorize_int32(carray carray_, carray labels=None):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_float64_helper(Py_ssize_t iter_range,
-                       Py_ssize_t allocation_size,
-                       ndarray[npy_float64] in_buffer,
-                       ndarray[npy_uint64] out_buffer,
+                       npy_float64[:] in_buffer,
+                       uint64_t[:] out_buffer,
                        kh_float64_t *table,
                        Py_ssize_t * count,
-                       dict reverse,
-                       ):
+                       ) nogil:
     cdef:
         Py_ssize_t i, idx
         int ret
@@ -330,7 +332,6 @@ cdef void _factorize_float64_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_float64(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse[count[0]] = element
             count[0] += 1
         out_buffer[i] = idx
 
@@ -344,6 +345,8 @@ def factorize_float64(carray carray_, carray labels=None):
         ndarray[npy_float64] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_float64_t *table
+        npy_float64[:] in_buffer_view
+        uint64_t[:] out_buffer_view
 
     count = 0
     ret = 0
@@ -355,6 +358,7 @@ def factorize_float64(carray carray_, carray labels=None):
         labels = carray([], dtype='int64', expectedlen=n)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
+    out_buffer_view = out_buffer
     in_buffer = np.empty(chunklen, dtype='float64')
     table = kh_init_float64()
 
@@ -362,31 +366,33 @@ def factorize_float64(carray carray_, carray labels=None):
         chunk_ = carray_.chunks[i]
         # decompress into in_buffer
         chunk_._getitem(0, chunklen, in_buffer.data)
+        in_buffer_view = in_buffer
         _factorize_float64_helper(chunklen,
-                        carray_.dtype.itemsize + 1,
-                        in_buffer,
-                        out_buffer,
-                        table,
-                        &count,
-                        reverse,
-                        )
+                in_buffer_view,
+                out_buffer_view,
+                table,
+                &count
+                )
         # compress out_buffer into labels
         labels.append(out_buffer.astype(np.int64))
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
+        in_buffer_view = carray_.leftover_array
         _factorize_float64_helper(leftover_elements,
-                          carray_.dtype.itemsize + 1,
-                          carray_.leftover_array,
-                          out_buffer,
-                          table,
-                          &count,
-                          reverse,
-                          )
+                in_buffer_view,
+                out_buffer_view,
+                table,
+                &count
+                )
 
     # compress out_buffer into labels
     labels.append(out_buffer[:leftover_elements].astype(np.int64))
 
+    for i in range(table.n_buckets):
+        if not kh_exist_float64(table, i):   # adjust function name to hash-table data-type
+            continue
+        reverse[table.vals[i]] = table.keys[i]
     kh_destroy_float64(table)
 
     return labels, reverse
