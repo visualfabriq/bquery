@@ -167,12 +167,13 @@ def factorize_{{ factor_type }}(carray carray_, carray labels=None):
     for in_buffer in bz.iterblocks(carray_):
         len_in_buffer = len(in_buffer)
         in_buffer_view = in_buffer
-        _factorize_{{ factor_type }}_helper(len_in_buffer,
-                        in_buffer_view,
-                        out_buffer_view,
-                        table,
-                        &count
-                        )
+        with nogil:
+            _factorize_{{ factor_type }}_helper(len_in_buffer,
+                            in_buffer_view,
+                            out_buffer_view,
+                            table,
+                            &count
+                            )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 

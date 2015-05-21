@@ -166,12 +166,13 @@ def factorize_int64(carray carray_, carray labels=None):
     for in_buffer in bz.iterblocks(carray_):
         len_in_buffer = len(in_buffer)
         in_buffer_view = in_buffer
-        _factorize_int64_helper(len_in_buffer,
-                        in_buffer_view,
-                        out_buffer_view,
-                        table,
-                        &count
-                        )
+        with nogil:
+            _factorize_int64_helper(len_in_buffer,
+                            in_buffer_view,
+                            out_buffer_view,
+                            table,
+                            &count
+                            )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
@@ -241,12 +242,13 @@ def factorize_int32(carray carray_, carray labels=None):
     for in_buffer in bz.iterblocks(carray_):
         len_in_buffer = len(in_buffer)
         in_buffer_view = in_buffer
-        _factorize_int32_helper(len_in_buffer,
-                        in_buffer_view,
-                        out_buffer_view,
-                        table,
-                        &count
-                        )
+        with nogil:
+            _factorize_int32_helper(len_in_buffer,
+                            in_buffer_view,
+                            out_buffer_view,
+                            table,
+                            &count
+                            )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
@@ -316,12 +318,13 @@ def factorize_float64(carray carray_, carray labels=None):
     for in_buffer in bz.iterblocks(carray_):
         len_in_buffer = len(in_buffer)
         in_buffer_view = in_buffer
-        _factorize_float64_helper(len_in_buffer,
-                        in_buffer_view,
-                        out_buffer_view,
-                        table,
-                        &count
-                        )
+        with nogil:
+            _factorize_float64_helper(len_in_buffer,
+                            in_buffer_view,
+                            out_buffer_view,
+                            table,
+                            &count
+                            )
         # compress out_buffer into labels
         labels.append(out_buffer[:len_in_buffer].astype(np.int64))
 
