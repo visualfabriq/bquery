@@ -1,5 +1,5 @@
 # internal imports
-import ctable_ext
+from bquery import ctable_ext
 
 # external imports
 import numpy as np
