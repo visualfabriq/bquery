@@ -489,7 +489,7 @@ class TestCtable():
 
     def test_groupby_08(self):
         """
-        test_groupby_08: Groupby's type 'sorted_count_distinct'
+        test_groupby_08: Groupby's type 'count_distinct'
         """
         random.seed(1)
 
@@ -557,7 +557,7 @@ class TestCtable():
 
     def test_groupby_09(self):
         """
-        test_groupby_08: Groupby's type 'sorted_count_distinct'
+        test_groupby_09: Groupby's type 'sorted_count_distinct'
         """
         random.seed(1)
 
