@@ -53,10 +53,10 @@ class TestCtable():
         pool_d = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
                 random.random(),
                 random.randint(- 10, 10),
                 random.randint(- 10, 10),
@@ -77,11 +77,11 @@ class TestCtable():
                                   np.nan,3.0,3.0,3.0,3.0])
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
-                pool_e.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
+                next(pool_e),
                 random.randint(- 10, 10),
                 random.randint(- 10, 10),
             )
@@ -94,10 +94,10 @@ class TestCtable():
         pool_d = itertools.cycle([1, 2, 3])
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
                 random.random(),
                 random.randint(- 10, 10),
                 random.randint(- 10, 10),
@@ -477,11 +477,11 @@ class TestCtable():
                                   np.nan, 3.0, 1.0, 3.0, 1.0])
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
-                pool_e.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
+                next(pool_e),
                 random.randint(- 500, 500),
                 random.randint(- 100, 100),
             )
@@ -544,14 +544,14 @@ class TestCtable():
         pool_g = (math.ceil(x) for x in np.arange(0, N, 1))
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
                 # --
-                pool_e.next(),
-                pool_f.next(),
-                pool_g.next(),
+                next(pool_e),
+                next(pool_f),
+                next(pool_g),
             )
             yield d
 

@@ -6,7 +6,12 @@ import cython
 import bcolz as bz
 from bcolz.carray_ext cimport carray, chunk
 
-import itertools as itt
+try:
+    # Python 2
+    from itertools import izip
+except ImportError:
+    # Python 3
+    izip = zip
 
 from libc.stdlib cimport malloc
 from libc.string cimport strcpy
@@ -664,7 +669,7 @@ cpdef is_in_ordered_subgroups(carray groups_col, carray bool_arr=None,
     x_ones = np.ones(max_len_subgroup, dtype='bool')
     x_zeros = np.zeros(max_len_subgroup, dtype='bool')
 
-    for bl_basket, bl_bool_arr in itt.izip(
+    for bl_basket, bl_bool_arr in izip(
             bz.iterblocks(groups_col, blen=blen),
             bz.iterblocks(bool_arr, blen=blen)):
 
