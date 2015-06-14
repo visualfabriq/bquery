@@ -568,7 +568,8 @@ class TestCtable():
 
         # -- Data --
         g = self.gen_dataset_count_with_NA_09(num_rows)
-        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+        sort = sorted([item for item in g], key=lambda x: x[0])
+        data = np.fromiter(sort, dtype='S1,f8,i8,i4,f8,i8,i4')
         print('data')
         print(data)
 
