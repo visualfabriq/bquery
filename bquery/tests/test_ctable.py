@@ -22,7 +22,7 @@ class TestCtable():
         self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
         os.rmdir(self.rootdir)  # folder should be emtpy
         ct = bquery.ctable(data, rootdir=self.rootdir)
-        # print ct
+        # print(ct)
         ct.flush()
         ct = bquery.open(self.rootdir)
 
@@ -33,11 +33,11 @@ class TestCtable():
 
 
     def setup(self):
-        print 'TestCtable.setup'
+        print('TestCtable.setup')
         self.rootdir = None
 
     def teardown(self):
-        print 'TestCtable.teardown'
+        print('TestCtable.teardown')
         if self.rootdir:
             shutil.rmtree(self.rootdir)
             self.rootdir = None
@@ -53,10 +53,10 @@ class TestCtable():
         pool_d = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
                 random.random(),
                 random.randint(- 10, 10),
                 random.randint(- 10, 10),
@@ -77,11 +77,11 @@ class TestCtable():
                                   np.nan,3.0,3.0,3.0,3.0])
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
-                pool_e.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
+                next(pool_e),
                 random.randint(- 10, 10),
                 random.randint(- 10, 10),
             )
@@ -94,10 +94,10 @@ class TestCtable():
         pool_d = itertools.cycle([1, 2, 3])
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
                 random.random(),
                 random.randint(- 10, 10),
                 random.randint(- 10, 10),
@@ -144,13 +144,13 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
-        print result_bcolz
+        print(result_bcolz)
 
         # Itertools result
         print('--> Itertools')
         result_itt = self.helper_itt_groupby(data, groupby_lambda)
         uniquekeys = result_itt['uniquekeys']
-        print uniquekeys
+        print(uniquekeys)
 
         assert_list_equal(list(result_bcolz['f0']), uniquekeys)
 
@@ -180,13 +180,13 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
-        print result_bcolz
+        print(result_bcolz)
 
         # Itertools result
         print('--> Itertools')
         result_itt = self.helper_itt_groupby(data, groupby_lambda)
         uniquekeys = result_itt['uniquekeys']
-        print uniquekeys
+        print(uniquekeys)
 
         assert_list_equal(
             sorted([list(x) for x in result_bcolz[groupby_cols]]),
@@ -218,13 +218,13 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
-        print result_bcolz
+        print(result_bcolz)
 
         # Itertools result
         print('--> Itertools')
         result_itt = self.helper_itt_groupby(data, groupby_lambda)
         uniquekeys = result_itt['uniquekeys']
-        print uniquekeys
+        print(uniquekeys)
 
         ref = []
         for item in result_itt['groups']:
@@ -268,13 +268,13 @@ class TestCtable():
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
-        print result_bcolz
+        print(result_bcolz)
 
         # Itertools result
         print('--> Itertools')
         result_itt = self.helper_itt_groupby(data, groupby_lambda)
         uniquekeys = result_itt['uniquekeys']
-        print uniquekeys
+        print(uniquekeys)
 
         ref = []
         for item in result_itt['groups']:
@@ -327,13 +327,13 @@ class TestCtable():
             fact_bcolz.flush()
 
             result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
-            print result_bcolz
+            print(result_bcolz)
 
             # Itertools result
             print('--> Itertools')
             result_itt = self.helper_itt_groupby(data, groupby_lambda)
             uniquekeys = result_itt['uniquekeys']
-            print uniquekeys
+            print(uniquekeys)
 
             ref = []
             for item in result_itt['groups']:
@@ -374,13 +374,13 @@ class TestCtable():
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
                                           agg_method='count')
-        print result_bcolz
+        print(result_bcolz)
 
         # Itertools result
         print('--> Itertools')
         result_itt = self.helper_itt_groupby(data, groupby_lambda)
         uniquekeys = result_itt['uniquekeys']
-        print uniquekeys
+        print(uniquekeys)
 
         ref = []
         for item in result_itt['groups']:
@@ -422,13 +422,13 @@ class TestCtable():
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
                                           agg_method='count_na')
-        print result_bcolz
+        print(result_bcolz)
 
         # Itertools result
         print('--> Itertools')
         result_itt = self.helper_itt_groupby(data, groupby_lambda)
         uniquekeys = result_itt['uniquekeys']
-        print uniquekeys
+        print(uniquekeys)
 
         ref = []
         for item in result_itt['groups']:
@@ -477,11 +477,11 @@ class TestCtable():
                                   np.nan, 3.0, 1.0, 3.0, 1.0])
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
-                pool_e.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
+                next(pool_e),
                 random.randint(- 500, 500),
                 random.randint(- 100, 100),
             )
@@ -489,7 +489,7 @@ class TestCtable():
 
     def test_groupby_08(self):
         """
-        test_groupby_08: Groupby's type 'sorted_count_distinct'
+        test_groupby_08: Groupby's type 'count_distinct'
         """
         random.seed(1)
 
@@ -501,8 +501,8 @@ class TestCtable():
         # -- Data --
         g = self.gen_dataset_count_with_NA_08(num_rows)
         data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
-        print 'data'
-        print data
+        print('data')
+        print(data)
 
         # -- Bcolz --
         print('--> Bcolz')
@@ -514,13 +514,13 @@ class TestCtable():
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
                                           agg_method='count_distinct')
-        print result_bcolz
+        print(result_bcolz)
         #
         # # Itertools result
         print('--> Itertools')
         result_itt = self.helper_itt_groupby(data, groupby_lambda)
         uniquekeys = result_itt['uniquekeys']
-        print uniquekeys
+        print(uniquekeys)
 
         ref = []
 
@@ -544,20 +544,20 @@ class TestCtable():
         pool_g = (math.ceil(x) for x in np.arange(0, N, 1))
         for _ in range(N):
             d = (
-                pool.next(),
-                pool_b.next(),
-                pool_c.next(),
-                pool_d.next(),
+                next(pool),
+                next(pool_b),
+                next(pool_c),
+                next(pool_d),
                 # --
-                pool_e.next(),
-                pool_f.next(),
-                pool_g.next(),
+                next(pool_e),
+                next(pool_f),
+                next(pool_g),
             )
             yield d
 
     def test_groupby_09(self):
         """
-        test_groupby_08: Groupby's type 'sorted_count_distinct'
+        test_groupby_09: Groupby's type 'sorted_count_distinct'
         """
         random.seed(1)
 
@@ -568,9 +568,10 @@ class TestCtable():
 
         # -- Data --
         g = self.gen_dataset_count_with_NA_09(num_rows)
-        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
-        print 'data'
-        print data
+        sort = sorted([item for item in g], key=lambda x: x[0])
+        data = np.fromiter(sort, dtype='S1,f8,i8,i4,f8,i8,i4')
+        print('data')
+        print(data)
 
         # -- Bcolz --
         print('--> Bcolz')
@@ -581,13 +582,13 @@ class TestCtable():
 
         result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
                                           agg_method='sorted_count_distinct')
-        print result_bcolz
+        print(result_bcolz)
 
         # # Itertools result
         print('--> Itertools')
         result_itt = self.helper_itt_groupby(data, groupby_lambda)
         uniquekeys = result_itt['uniquekeys']
-        print uniquekeys
+        print(uniquekeys)
 
         ref = []
 
@@ -596,7 +597,7 @@ class TestCtable():
             f5 = len(self._get_unique([x[5] for x in result_itt['groups'][n]]))
             f6 = len(self._get_unique([x[6] for x in result_itt['groups'][n]]))
             ref.append([u, f4, f5, f6])
-        print ref
+        print(ref)
 
         assert_list_equal(
             [list(x) for x in result_bcolz], ref)

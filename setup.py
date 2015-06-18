@@ -112,7 +112,7 @@ class bquery_build_ext(build_ext):
                 exit_with_error(
                     "You need the python package jinja2 to rebuild the " + \
                     "extension from the templates")
-            execfile("bquery/templates/run_templates.py")
+            exec(open("bquery/templates/run_templates.py").read())
 
         build_ext.run(self)
 

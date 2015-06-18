@@ -1,5 +1,5 @@
 # internal imports
-import ctable_ext
+from bquery import ctable_ext
 
 # external imports
 import numpy as np
@@ -70,7 +70,7 @@ class ctable(bcolz.ctable):
                 carray_factor.flush()
 
                 carray_values = \
-                    bcolz.carray(values.values(), dtype=self[col].dtype,
+                    bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype),
                                  rootdir=col_values_rootdir, mode='w')
                 carray_values.flush()
 
@@ -240,7 +240,7 @@ class ctable(bcolz.ctable):
             else:
                 col_factor_carray, values = ctable_ext.factorize(self[col])
                 col_values_carray = \
-                    bcolz.carray(values.values(), dtype=self[col].dtype)
+                    bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype))
 
             factor_list.append(col_factor_carray)
             values_list.append(col_values_carray)
@@ -299,7 +299,7 @@ class ctable(bcolz.ctable):
             # values might contain one value too much (-1) (no direct lookup
             # possible because values is a reversed dict)
             filter_check = \
-                [key for key, value in values.iteritems() if value == -1]
+                [key for key, value in values.items() if value == -1]
             if filter_check:
                 skip_key = filter_check[0]
 
