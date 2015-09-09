@@ -257,7 +257,7 @@ class ctable(bcolz.ctable):
             factor_carray = bcolz.zeros(array_length, dtype='int64')
             values = ['Total']
 
-        elif len(factor_list) == 1:
+    _n_')    elif len(factor_list) == 1:
             # single column groupby, the groupby output column
             # here is 1:1 to the values
             factor_carray = factor_list[0]
