@@ -275,13 +275,21 @@ class ctable(bcolz.ctable):
             eval_str = ''
             previous_value = 1
             for col, values \
-                    in zip(reversed(groupby_cols), reversed(values_list)):
+                    in zip(groupby_cols, values_list):
                 if eval_str:
                     eval_str += ' + '
                 else:
                     eval_str += '-2147483648 + '
                 eval_str += str(previous_value) + '*' + col
                 previous_value *= values.len
+
+            # check for overflow and use a compound string if necessary
+            if previous_value > 4294967295:
+                eval_str = ''
+                for col in groupby_cols:
+                    if eval_str:
+                        eval_str += " + '.' + "
+                    eval_str += 'str(' + col + ')'
 
             # calculate the cartesian group index for each row
             factor_input = bcolz.eval(eval_str, user_dict=factor_set)
