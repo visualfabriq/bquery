@@ -278,6 +278,8 @@ class ctable(bcolz.ctable):
                     in zip(reversed(groupby_cols), reversed(values_list)):
                 if eval_str:
                     eval_str += ' + '
+                else:
+                    eval_str += '-2147483648 + '
                 eval_str += str(previous_value) + '*' + col
                 previous_value *= values.len
 
