@@ -279,7 +279,7 @@ class ctable(bcolz.ctable):
                 if eval_str:
                     eval_str += ' + '
                 eval_str += str(previous_value) + '*' + col
-                previous_value *= len(values)
+                previous_value *= values.len
 
             # calculate the cartesian group index for each row
             factor_input = bcolz.eval(eval_str, user_dict=factor_set)
