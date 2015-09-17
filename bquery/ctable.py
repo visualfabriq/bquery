@@ -249,6 +249,34 @@ class ctable(bcolz.ctable):
 
     def make_group_index(self, factor_list, values_list, groupby_cols,
                          array_length, bool_arr):
+
+        def create_eval_str(groupby_cols, values_list):
+
+            eval_list = []
+            eval_str = ''
+            previous_value = 1
+
+            for col, values \
+                    in zip(groupby_cols, values_list):
+
+                # check for overflow
+                if previous_value * values.len > 4294967295:
+                    eval_list.append(eval_str)
+                    # reset
+                    eval_str = ''
+                    previous_value = 1
+
+                if eval_str:
+                    eval_str += ' + '
+                else:
+                    eval_str += '-2147483648 + '
+
+                eval_str += str(previous_value) + '*' + col
+                previous_value *= values.len
+
+            eval_list.append(eval_str)
+            return eval_list
+
         # create unique groups for groupby loop
 
         if len(factor_list) == 0:
@@ -272,20 +300,34 @@ class ctable(bcolz.ctable):
 
             # create a numexpr expression that calculates the place on
             # a cartesian join index
-            eval_str = ''
-            previous_value = 1
-            for col, values \
-                    in zip(reversed(groupby_cols), reversed(values_list)):
-                if eval_str:
-                    eval_str += ' + '
-                eval_str += str(previous_value) + '*' + col
-                previous_value *= len(values)
 
-            # calculate the cartesian group index for each row
-            factor_input = bcolz.eval(eval_str, user_dict=factor_set)
+            eval_list = create_eval_str(groupby_cols, values_list)
 
-            # now factorize the unique groupby combinations
-            factor_carray, values = ctable_ext.factorize(factor_input)
+            factorize_list = []
+            for eval_str in eval_list:
+                # calculate the cartesian group index for each row
+                factor_input = bcolz.eval(eval_str, user_dict=factor_set)
+                # now factorize the unique groupby combinations
+                sub_factor_carray, sub_values = ctable_ext.factorize(factor_input)
+                factorize_list.append((sub_factor_carray, sub_values))
+
+            if len(eval_list) == 1:
+                # if there was no overflow, the factor & values are the direct result
+                factor_carray, values = eval_list[0]
+            else:
+                # create a new unique array by factorizing the individual results
+                super_factor_set = {'g' + str(i): x[0] for i, x in enumerate(eval_list)}
+                super_groupby_cols = ['g' + str(i) for i, x in enumerate(eval_list)]
+                super_values_list = [x[1] for i, x in enumerate(eval_list)]
+                eval_list = create_eval_str(super_groupby_cols, super_values_list)
+
+                if eval_list > 0:
+                    raise OverflowError('Too many unique dimension combinations possible')
+
+                # calculate the cartesian group index for each row
+                factor_input = bcolz.eval(eval_list[0], user_dict=super_factor_set)
+                # now factorize the unique groupby combinations
+                factor_carray, values = ctable_ext.factorize(factor_input)
 
         skip_key = None
 
