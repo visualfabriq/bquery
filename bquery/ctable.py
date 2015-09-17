@@ -260,7 +260,7 @@ class ctable(bcolz.ctable):
                     in zip(groupby_cols, values_list):
 
                 # check for overflow
-                if previous_value * values.len > 4294967295:
+                if previous_value * len(values) > 4294967295:
                     eval_list.append(eval_str)
                     # reset
                     eval_str = ''
@@ -272,7 +272,7 @@ class ctable(bcolz.ctable):
                     eval_str += '-2147483648 + '
 
                 eval_str += str(previous_value) + '*' + col
-                previous_value *= values.len
+                previous_value *= len(values)
 
             eval_list.append(eval_str)
             return eval_list
