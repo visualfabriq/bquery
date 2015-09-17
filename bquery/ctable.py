@@ -313,12 +313,12 @@ class ctable(bcolz.ctable):
 
             if len(eval_list) == 1:
                 # if there was no overflow, the factor & values are the direct result
-                factor_carray, values = eval_list[0]
+                factor_carray, values = factorize_list[0]
             else:
                 # create a new unique array by factorizing the individual results
-                super_factor_set = {'g' + str(i): x[0] for i, x in enumerate(eval_list)}
-                super_groupby_cols = ['g' + str(i) for i, x in enumerate(eval_list)]
-                super_values_list = [x[1] for i, x in enumerate(eval_list)]
+                super_factor_set = {'g' + str(i): x[0] for i, x in enumerate(factorize_list)}
+                super_groupby_cols = ['g' + str(i) for i, x in enumerate(factorize_list)]
+                super_values_list = [x[1] for i, x in enumerate(factorize_list)]
                 eval_list = create_eval_str(super_groupby_cols, super_values_list)
 
                 if eval_list > 0:
