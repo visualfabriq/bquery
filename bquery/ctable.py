@@ -259,7 +259,7 @@ class ctable(bcolz.ctable):
             print [len(val) for val in values_list]
             # Sort evaluated columns by length
             col_len_list = [(col, values) for col, values in zip(groupby_cols, values_list)]
-            col_len_list.sort(key=lambda x: len(x[2]))
+            col_len_list.sort(key=lambda x: len(x[1]))
             groupby_cols = [col for col, _ in col_len_list]
             values_list = [values for _, values in col_len_list]
             print "After sorting"
