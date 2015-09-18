@@ -257,6 +257,14 @@ class ctable(bcolz.ctable):
             previous_value = 1
             print groupby_cols
             print [len(val) for val in values_list]
+            # Sort evaluated columns by length
+            col_len_list = [(col, values) for col, values in zip(groupby_cols, values_list)]
+            col_len_list.sort(key=lambda x: len(x[2]))
+            groupby_cols = [col for col, _ in col_len_list]
+            values_list = [values for _, values in col_len_list]
+            print "After sorting"
+            print groupby_cols
+            print [len(val) for val in values_list]
 
             for col, values \
                     in zip(groupby_cols, values_list):
@@ -306,6 +314,7 @@ class ctable(bcolz.ctable):
                 super_groupby_cols = ['g' + str(i) for i, x in enumerate(factorize_list)]
                 super_values_list = [x[1] for i, x in enumerate(factorize_list)]
 
+                # If evaluation expressions cannot be reduced, fallback to python virtual machine
                 if len(values_list) == len(super_values_list):
                     super_eval_list = create_eval_str(groupby_cols, values_list, check_overflow=False)
                     super_factorize_list = _calc_group_index(super_eval_list, super_factor_set, vm='python')
