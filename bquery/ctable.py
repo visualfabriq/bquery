@@ -4,7 +4,7 @@ from bquery import ctable_ext
 # external imports
 import numpy as np
 import bcolz
-from collections import namedtuple
+import gc
 import os
 from bquery.ctable_ext import \
     SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
@@ -110,7 +110,7 @@ class ctable(bcolz.ctable):
 
         return output
 
-    def aggregate_groups_by_iter_2(self, ct_agg, nr_groups, skip_key,
+    def aggregate_groups(self, ct_agg, nr_groups, skip_key,
                                    factor_carray, groupby_cols, output_agg_ops,
                                    bool_arr=None,
                                    agg_method=ctable_ext.SUM):
@@ -207,7 +207,7 @@ class ctable(bcolz.ctable):
             self.create_agg_ctable(groupby_cols, agg_list, nr_groups, rootdir)
 
         # perform aggregation
-        self.aggregate_groups_by_iter_2(ct_agg, nr_groups, skip_key,
+        self.aggregate_groups(ct_agg, nr_groups, skip_key,
                                         factor_carray, groupby_cols,
                                         agg_ops,
                                         bool_arr=bool_arr,
