@@ -249,6 +249,105 @@ class ctable(bcolz.ctable):
 
     def make_group_index(self, factor_list, values_list, groupby_cols,
                          array_length, bool_arr):
+
+        def _create_eval_str(groupby_cols, values_list, check_overflow=True):
+
+            eval_list = []
+            eval_str = ''
+            col_list = []
+            previous_value = 1
+            # Sort evaluated columns by length
+            col_len_list = [(col, values) for col, values in zip(groupby_cols, values_list)]
+            col_len_list.sort(key=lambda x: len(x[1]))
+            groupby_cols = [col for col, _ in col_len_list]
+            values_list = [values for _, values in col_len_list]
+
+            for col, values \
+                    in zip(groupby_cols, values_list):
+
+                # check for overflow
+                if check_overflow:
+                    if previous_value * len(values) > 4294967295:
+                        eval_list.append((eval_str, col_list))
+                        # reset
+                        eval_str = ''
+                        col_list = []
+                        previous_value = 1
+
+                if eval_str:
+                    eval_str += ' + '
+                else:
+                    eval_str += '-2147483648 + '
+
+                eval_str += str(previous_value) + '*' + col
+                col_list.append(col)
+                previous_value *= len(values)
+
+            eval_list.append((eval_str, col_list))
+            return eval_list
+
+        def _calc_group_index(eval_list, factor_set, vm=None):
+            factorize_list = []
+            for eval_node in eval_list:
+                # calculate the cartesian group index for each row
+                factor_input = bcolz.eval(eval_node[0], user_dict=factor_set, vm=vm)
+                # now factorize the unique groupby combinations
+                sub_factor_carray, sub_values = ctable_ext.factorize(factor_input)
+                factorize_list.append((sub_factor_carray, sub_values))
+            return factorize_list
+
+        def calc_index(groupby_cols, values_list, factor_set):
+
+            eval_list = _create_eval_str(groupby_cols, values_list)
+            factorize_list = _calc_group_index(eval_list, factor_set)
+
+            if len(eval_list) == 1:
+                # if there was no overflow, the factor & values are the direct result
+                return factorize_list[0]
+            else:
+                # create a new unique array by factorizing the individual results
+                super_factor_set = {'g' + str(i): x[0] for i, x in enumerate(factorize_list)}
+                super_groupby_cols = ['g' + str(i) for i, x in enumerate(factorize_list)]
+                super_values_list = [x[1] for i, x in enumerate(factorize_list)]
+
+                # If evaluation expressions cannot be reduced, fallback to python virtual machine
+                if len(values_list) == len(super_values_list):
+                    super_eval_list = _create_eval_str(groupby_cols, values_list, check_overflow=False)
+                    super_factorize_list = _calc_group_index(super_eval_list, super_factor_set, vm='python')
+                    return super_factorize_list[0]
+                return calc_index(super_groupby_cols, super_values_list, super_factor_set)
+
+        def _is_reducible(eval_list):
+            for eval_node in eval_list:
+                if len(eval_node[1]) > 1:
+                    return True
+            return False
+
+        def calc_index_no_recursive(groupby_cols, values_list, factor_set, vm=None):
+            # Initialize eval list
+            eval_list = _create_eval_str(groupby_cols, values_list)
+
+            # Reduce expression as possible
+            while _is_reducible(eval_list):
+                del groupby_cols
+                del values_list
+                factorize_list = _calc_group_index(eval_list, factor_set)
+                factor_set = {'g' + str(i): x[0] for i, x in enumerate(factorize_list)}
+                groupby_cols = ['g' + str(i) for i, x in enumerate(factorize_list)]
+                values_list = [x[1] for i, x in enumerate(factorize_list)]
+                eval_list = _create_eval_str(groupby_cols, values_list)
+            # If we have multiple expressions that cannot be reduced anymore, rewrite as a single one and use Python vm
+            if len(eval_list) > 1:
+                eval_list = _create_eval_str(groupby_cols, values_list, check_overflow=False)
+                vm = 'python'
+
+            del groupby_cols
+            del values_list
+
+            # Now we have a single expression, factorize it
+            return _calc_group_index(eval_list, factor_set, vm=vm)[0]
+
+
         # create unique groups for groupby loop
 
         if len(factor_list) == 0:
@@ -272,30 +371,7 @@ class ctable(bcolz.ctable):
 
             # create a numexpr expression that calculates the place on
             # a cartesian join index
-            eval_str = ''
-            previous_value = 1
-            for col, values \
-                    in zip(groupby_cols, values_list):
-                if eval_str:
-                    eval_str += ' + '
-                else:
-                    eval_str += '-2147483648 + '
-                eval_str += str(previous_value) + '*' + col
-                previous_value *= values.len
-
-            # check for overflow and use a compound string if necessary
-            if previous_value > 4294967295:
-                eval_str = ''
-                for col in groupby_cols:
-                    if eval_str:
-                        eval_str += " + '.' + "
-                    eval_str += 'str(' + col + ')'
-
-            # calculate the cartesian group index for each row
-            factor_input = bcolz.eval(eval_str, user_dict=factor_set)
-
-            # now factorize the unique groupby combinations
-            factor_carray, values = ctable_ext.factorize(factor_input)
+            factor_carray, values = calc_index_no_recursive(groupby_cols, values_list, factor_set)
 
         skip_key = None
 
@@ -506,4 +582,3 @@ class ctable(bcolz.ctable):
             ctable_ext.is_in_ordered_subgroups(
                 self[basket_col], bool_arr=bool_arr,
                 _max_len_subgroup=_max_len_subgroup)
-
