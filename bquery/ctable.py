@@ -256,8 +256,6 @@ class ctable(bcolz.ctable):
             eval_str = ''
             col_list = []
             previous_value = 1
-            print groupby_cols
-            print [len(val) for val in values_list]
             # Sort evaluated columns by length
             col_len_list = [(col, values) for col, values in zip(groupby_cols, values_list)]
             col_len_list.sort(key=lambda x: len(x[1]))
@@ -267,7 +265,6 @@ class ctable(bcolz.ctable):
             for col, values \
                     in zip(groupby_cols, values_list):
 
-                print previous_value
                 # check for overflow
                 if check_overflow:
                     if previous_value * len(values) > 4294967295:
@@ -302,7 +299,6 @@ class ctable(bcolz.ctable):
         def calc_index(groupby_cols, values_list, factor_set):
 
             eval_list = _create_eval_str(groupby_cols, values_list)
-            print eval_list
             factorize_list = _calc_group_index(eval_list, factor_set)
 
             if len(eval_list) == 1:
@@ -330,7 +326,6 @@ class ctable(bcolz.ctable):
         def calc_index_no_recursive(groupby_cols, values_list, factor_set, vm=None):
             # Initialize eval list
             eval_list = _create_eval_str(groupby_cols, values_list)
-            print eval_list
 
             # Reduce expression as possible
             while _is_reducible(eval_list):
@@ -341,7 +336,6 @@ class ctable(bcolz.ctable):
                 groupby_cols = ['g' + str(i) for i, x in enumerate(factorize_list)]
                 values_list = [x[1] for i, x in enumerate(factorize_list)]
                 eval_list = _create_eval_str(groupby_cols, values_list)
-                print eval_list
             # If we have multiple expressions that cannot be reduced anymore, rewrite as a single one and use Python vm
             if len(eval_list) > 1:
                 eval_list = _create_eval_str(groupby_cols, values_list, check_overflow=False)
