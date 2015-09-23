@@ -4,7 +4,7 @@ from bquery import ctable_ext
 # external imports
 import numpy as np
 import bcolz
-from collections import namedtuple
+import gc
 import os
 from bquery.ctable_ext import \
     SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
@@ -64,7 +64,7 @@ class ctable(bcolz.ctable):
 
                 carray_factor = \
                     bcolz.carray([], dtype='int64', expectedlen=self.size,
-                                   rootdir=col_factor_rootdir, mode='w')
+                                 rootdir=col_factor_rootdir, mode='w')
                 _, values = \
                     ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
@@ -110,7 +110,7 @@ class ctable(bcolz.ctable):
 
         return output
 
-    def aggregate_groups_by_iter_2(self, ct_agg, nr_groups, skip_key,
+    def aggregate_groups(self, ct_agg, nr_groups, skip_key,
                                    factor_carray, groupby_cols, output_agg_ops,
                                    bool_arr=None,
                                    agg_method=ctable_ext.SUM):
@@ -207,10 +207,10 @@ class ctable(bcolz.ctable):
             self.create_agg_ctable(groupby_cols, agg_list, nr_groups, rootdir)
 
         # perform aggregation
-        self.aggregate_groups_by_iter_2(ct_agg, nr_groups, skip_key,
+        self.aggregate_groups(ct_agg, nr_groups, skip_key,
                                         factor_carray, groupby_cols,
                                         agg_ops,
-                                        bool_arr= bool_arr,
+                                        bool_arr=bool_arr,
                                         agg_method=_agg_method)
 
         return ct_agg
@@ -296,34 +296,13 @@ class ctable(bcolz.ctable):
                 factorize_list.append((sub_factor_carray, sub_values))
             return factorize_list
 
-        def calc_index(groupby_cols, values_list, factor_set):
-
-            eval_list = _create_eval_str(groupby_cols, values_list)
-            factorize_list = _calc_group_index(eval_list, factor_set)
-
-            if len(eval_list) == 1:
-                # if there was no overflow, the factor & values are the direct result
-                return factorize_list[0]
-            else:
-                # create a new unique array by factorizing the individual results
-                super_factor_set = {'g' + str(i): x[0] for i, x in enumerate(factorize_list)}
-                super_groupby_cols = ['g' + str(i) for i, x in enumerate(factorize_list)]
-                super_values_list = [x[1] for i, x in enumerate(factorize_list)]
-
-                # If evaluation expressions cannot be reduced, fallback to python virtual machine
-                if len(values_list) == len(super_values_list):
-                    super_eval_list = _create_eval_str(groupby_cols, values_list, check_overflow=False)
-                    super_factorize_list = _calc_group_index(super_eval_list, super_factor_set, vm='python')
-                    return super_factorize_list[0]
-                return calc_index(super_groupby_cols, super_values_list, super_factor_set)
-
         def _is_reducible(eval_list):
             for eval_node in eval_list:
                 if len(eval_node[1]) > 1:
                     return True
             return False
 
-        def calc_index_no_recursive(groupby_cols, values_list, factor_set, vm=None):
+        def calc_index(groupby_cols, values_list, factor_set, vm=None):
             # Initialize eval list
             eval_list = _create_eval_str(groupby_cols, values_list)
 
@@ -347,31 +326,25 @@ class ctable(bcolz.ctable):
             # Now we have a single expression, factorize it
             return _calc_group_index(eval_list, factor_set, vm=vm)[0]
 
-
         # create unique groups for groupby loop
-
         if len(factor_list) == 0:
             # no columns to groupby over, so directly aggregate the measure
             # columns to 1 total (index 0/zero)
             factor_carray = bcolz.zeros(array_length, dtype='int64')
             values = ['Total']
-
-    _n_')    elif len(factor_list) == 1:
+        elif len(factor_list) == 1:
             # single column groupby, the groupby output column
             # here is 1:1 to the values
             factor_carray = factor_list[0]
             values = values_list[0]
-
         else:
             # multi column groupby
             # nb: this might also be cached in the future
-
             # first combine the factorized columns to single values
             factor_set = {x: y for x, y in zip(groupby_cols, factor_list)}
-
             # create a numexpr expression that calculates the place on
             # a cartesian join index
-            factor_carray, values = calc_index_no_recursive(groupby_cols, values_list, factor_set)
+            factor_carray, values = calc_index(groupby_cols, values_list, factor_set)
 
         skip_key = None
 
