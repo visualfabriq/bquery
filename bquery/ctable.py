@@ -372,10 +372,22 @@ class ctable(bcolz.ctable):
 
         return factor_carray, nr_groups, skip_key
 
-    def create_agg_ctable(self, groupby_cols, agg_list, nr_groups, rootdir):
-        # create output table
+    def create_agg_ctable(self, groupby_cols, agg_list, expectedlen, rootdir):
+        '''Create the output table
+
+        Args:
+            groupby_cols: a list of columns to groupby over
+            agg_list: the aggregation operations (see groupby for more info)
+            expectedlen: expected length of output table
+            rootdir: the directory to write the table to
+
+        Returns:
+            A ctable in the correct format for containing the output of the
+            specified aggregation operations.
+        '''
         dtype_list = []
 
+        # include all the input columns
         for col in groupby_cols:
             dtype_list.append((col, self[col].dtype))
 
@@ -420,7 +432,7 @@ class ctable(bcolz.ctable):
         # create aggregation table
         ct_agg = bcolz.ctable(
             np.zeros(0, dtype_list),
-            expectedlen=nr_groups,
+            expectedlen=expectedlen,
             rootdir=rootdir)
 
         return ct_agg, dtype_list, agg_ops
