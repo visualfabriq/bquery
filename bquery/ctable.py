@@ -114,6 +114,21 @@ class ctable(bcolz.ctable):
                                    factor_carray, groupby_cols, output_agg_ops,
                                    bool_arr=None,
                                    agg_method=ctable_ext.SUM):
+        '''Perform aggregation and place the result in the given ctable.
+
+        Args:
+            ct_agg (ctable): the table to hold the aggregation
+            nr_groups (int): the number of groups (number of rows in output table)
+            skip_key:
+            factor_carray:
+            groupby_cols:
+            output_agg_ops (list): list of tuples of the form: (input_col, agg_op)
+                    input_col (string): name of the column to act on
+                    agg_op (int): aggregation operation to perform
+            bool_arr:
+            agg_method (int): the type of aggregation to perform
+
+        '''
         total = []
 
         for col in groupby_cols:
@@ -249,6 +264,20 @@ class ctable(bcolz.ctable):
 
     def make_group_index(self, factor_list, values_list, groupby_cols,
                          array_length, bool_arr):
+        '''Create unique groups for groupby loop
+
+            Args:
+                factor_list:
+                values_list:
+                groupby_cols:
+                array_length:
+                bool_arr:
+
+            Returns:
+                carray: (factor_carray)
+                int: (nr_groups) the number of resulting groups
+                int: (skip_key)
+        '''
 
         def _create_eval_str(groupby_cols, values_list, check_overflow=True):
 
@@ -373,17 +402,28 @@ class ctable(bcolz.ctable):
         return factor_carray, nr_groups, skip_key
 
     def create_agg_ctable(self, groupby_cols, agg_list, expectedlen, rootdir):
-        '''Create the output table
+        '''Create the output table and return a list of tuples describing it
+            and a list of tuples describing aggregation operations to
+            perform. The list of tuples describing the table is identical
+            to the list specifying dtypes used to create the numpy array which
+            is the basis of the ctable.
 
         Args:
-            groupby_cols: a list of columns to groupby over
-            agg_list: the aggregation operations (see groupby for more info)
-            expectedlen: expected length of output table
-            rootdir: the directory to write the table to
+            groupby_cols (list): a list of columns to groupby over
+            agg_list (list): the aggregation operations (see groupby for more info)
+            expectedlen (int): expected length of output table
+            rootdir (string): the directory to write the table to
 
         Returns:
-            A ctable in the correct format for containing the output of the
-            specified aggregation operations.
+            ctable: A table in the correct format for containing the output of
+                    the specified aggregation operations.
+            list: (dtype_list) list of tuples describing the output table.
+                   it's of the form (output_col, col_dtype).
+                   output_col (string): name of the output column
+                   col_dtype (numpy.dtype): data type of output column
+            list: (agg_ops) list of tuples of the form: (input_col, agg_op)
+                    input_col (string): name of the column to act on
+                    agg_op (int): aggregation operation to perform
         '''
         dtype_list = []
 
