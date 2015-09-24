@@ -119,7 +119,7 @@ class ctable(bcolz.ctable):
         Args:
             ct_agg (ctable): the table to hold the aggregation
             nr_groups (int): the number of groups (number of rows in output table)
-            skip_key:
+            skip_key (int): index of the output row to remove from results
             factor_carray:
             groupby_cols:
             output_agg_ops (list): list of tuples of the form: (input_col, agg_op)
@@ -137,21 +137,21 @@ class ctable(bcolz.ctable):
 
         for col, agg_op in output_agg_ops:
             # TODO: input vs output column
-            col_dtype = ct_agg[col].dtype
+            input_col_dtype = ct_agg[col].dtype
 
-            if col_dtype == np.float64:
+            if input_col_dtype == np.float64:
                 r = ctable_ext.sum_float64(self[col], factor_carray, nr_groups,
                                            skip_key, agg_method=agg_method)
-            elif col_dtype == np.int64:
+            elif input_col_dtype == np.int64:
                 r = ctable_ext.sum_int64(self[col], factor_carray, nr_groups,
                                          skip_key, agg_method=agg_method)
-            elif col_dtype == np.int32:
+            elif input_col_dtype == np.int32:
                 r = ctable_ext.sum_int32(self[col], factor_carray, nr_groups,
                                          skip_key, agg_method=agg_method)
             else:
                 raise NotImplementedError(
                     'Column dtype ({0}) not supported for aggregation yet '
-                    '(only int32, int64 & float64)'.format(str(col_dtype)))
+                    '(only int32, int64 & float64)'.format(str(input_col_dtype)))
 
             total.append(r)
 
@@ -459,7 +459,7 @@ class ctable(bcolz.ctable):
                             'Unknown Aggregation Type: ' + unicode(agg_op))
                     agg_op = op_translation[agg_op]
 
-            col_dtype = self[input_col].dtype
+            output_col_dtype = self[input_col].dtype
             # TODO: check if the aggregation columns is numeric
             # NB: we could build a concatenation for strings like pandas, but I would really prefer to see that as a
             # separate operation
@@ -467,7 +467,7 @@ class ctable(bcolz.ctable):
             # save output
             agg_cols.append(output_col)
             agg_ops.append((input_col, agg_op))
-            dtype_list.append((output_col, col_dtype))
+            dtype_list.append((output_col, output_col_dtype))
 
         # create aggregation table
         ct_agg = bcolz.ctable(
