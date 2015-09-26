@@ -195,7 +195,8 @@ class TestCtable():
     def test_groupby_03(self):
         """
         test_groupby_03: Test groupby's aggregations
-                         (groupby single row results into multiple groups)
+                        (groupby single row results into multiple groups)
+                        Groupby type 'sum'
         """
         random.seed(1)
 
@@ -217,7 +218,8 @@ class TestCtable():
         fact_bcolz.flush()
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
-        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
+                                            agg_method='sum')
         print(result_bcolz)
 
         # Itertools result
@@ -246,6 +248,7 @@ class TestCtable():
         test_groupby_04: Test groupby's aggregation
                              (groupby over multiple rows results
                              into multiple groups)
+                             Groupby type 'sum'
         """
         random.seed(1)
 
@@ -267,7 +270,8 @@ class TestCtable():
         fact_bcolz.flush()
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
-        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
+                                            agg_method='sum')
         print(result_bcolz)
 
         # Itertools result
@@ -295,6 +299,7 @@ class TestCtable():
     def test_groupby_05(self):
         """
         test_groupby_05: Test groupby's group creation without cache
+        Groupby type 'sum'
         """
         random.seed(1)
 
@@ -326,7 +331,8 @@ class TestCtable():
             fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
             fact_bcolz.flush()
 
-            result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
+            result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
+                                                agg_method='sum')
             print(result_bcolz)
 
             # Itertools result
