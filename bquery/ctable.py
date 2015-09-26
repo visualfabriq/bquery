@@ -4,7 +4,7 @@ from bquery import ctable_ext
 # external imports
 import numpy as np
 import bcolz
-import gc
+import tempfile
 import os
 from bquery.ctable_ext import \
     SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
@@ -112,62 +112,61 @@ class ctable(bcolz.ctable):
 
     def aggregate_groups(self, ct_agg, nr_groups, skip_key,
                                    factor_carray, groupby_cols, output_agg_ops,
-                                   bool_arr=None,
-                                   agg_method=ctable_ext.SUM):
+                                   dtype_dict, bool_arr=None):
         '''Perform aggregation and place the result in the given ctable.
 
         Args:
             ct_agg (ctable): the table to hold the aggregation
             nr_groups (int): the number of groups (number of rows in output table)
-            skip_key (int): index of the output row to remove from results
-            factor_carray:
-            groupby_cols:
+            skip_key (int): index of the output row to remove from results (used for filtering)
+            factor_carray: the carray for each row in the table a reference to the the unique group index
+            groupby_cols: the list of 'dimension' columns that are used to perform the groupby over
             output_agg_ops (list): list of tuples of the form: (input_col, agg_op)
                     input_col (string): name of the column to act on
                     agg_op (int): aggregation operation to perform
-            bool_arr:
-            agg_method (int): the type of aggregation to perform
+            bool_arr: a boolean array containing the filter
 
         '''
-        total = []
 
+        # this creates the groupby columns
         for col in groupby_cols:
-            total.append(ctable_ext.groupby_value(self[col], factor_carray,
-                                                  nr_groups, skip_key))
+            result_array = ctable_ext.groupby_value(self[col], factor_carray,
+                                                  nr_groups, skip_key)
 
-        for col, agg_op in output_agg_ops:
-            # TODO: input vs output column
-            input_col_dtype = ct_agg[col].dtype
+            if bool_arr is not None:
+                result_array = np.delete(result_array, skip_key)
 
-            if input_col_dtype == np.float64:
-                r = ctable_ext.sum_float64(self[col], factor_carray, nr_groups,
-                                           skip_key, agg_method=agg_method)
-            elif input_col_dtype == np.int64:
-                r = ctable_ext.sum_int64(self[col], factor_carray, nr_groups,
-                                         skip_key, agg_method=agg_method)
-            elif input_col_dtype == np.int32:
-                r = ctable_ext.sum_int32(self[col], factor_carray, nr_groups,
-                                         skip_key, agg_method=agg_method)
+            ct_agg.addcol(result_array, name=col)
+            del result_array
+
+        # this creates the aggregation columns
+        for input_col, output_col, agg_op in output_agg_ops:
+
+            col_dtype = dtype_dict[output_col]
+
+            if col_dtype == np.float64:
+                result_array = ctable_ext.agg_float64(self[input_col], factor_carray, nr_groups,
+                                           skip_key, agg_method=agg_op)
+            elif col_dtype == np.int64:
+                result_array = ctable_ext.agg_int64(self[input_col], factor_carray, nr_groups,
+                                         skip_key, agg_method=agg_op)
+            elif col_dtype == np.int32:
+                result_array = ctable_ext.agg_int32(self[input_col], factor_carray, nr_groups,
+                                         skip_key, agg_method=agg_op)
             else:
                 raise NotImplementedError(
                     'Column dtype ({0}) not supported for aggregation yet '
                     '(only int32, int64 & float64)'.format(str(input_col_dtype)))
 
-            total.append(r)
+            if bool_arr is not None:
+                result_array = np.delete(result_array, skip_key)
 
-        # TODO: fix ugly fix?
-        if bool_arr is not None:
-            total_v2 = []
-            for a in total:
-                total_v2.append(
-                    [item for (n, item) in enumerate(a) if n != skip_key])
-            total = total_v2
-        # end of fix
+            ct_agg.addcol(result_array, name=output_col)
+            del result_array
 
-        ct_agg.append(total)
+        ct_agg.delcol('tmp_col_bquery__')
 
-    def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None,
-                agg_method='sum'):
+    def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None):
         """
 
         Aggregate the ctable
@@ -198,15 +197,6 @@ class ctable(bcolz.ctable):
                           previously presorted
 
         """
-        # TODO: change aggregation types to method as described in "a list with the type of aggregation for each column"
-        map_agg_method = {
-            'sum': SUM,
-            'count': COUNT,
-            'count_na': COUNT_NA,
-            'count_distinct': COUNT_DISTINCT,
-            'sorted_count_distinct': SORTED_COUNT_DISTINCT,
-        }
-        _agg_method = map_agg_method[agg_method]
 
         if not agg_list:
             raise AttributeError('One or more aggregation operations '
@@ -218,15 +208,19 @@ class ctable(bcolz.ctable):
             self.make_group_index(factor_list, values_list, groupby_cols,
                                   len(self), bool_arr)
 
-        ct_agg, dtype_list, agg_ops = \
-            self.create_agg_ctable(groupby_cols, agg_list, nr_groups, rootdir)
+        if bool_arr is None:
+            expectedlen = nr_groups
+        else:
+            expectedlen = nr_groups -1
+
+        ct_agg, dtype_dict, agg_ops = \
+            self.create_agg_ctable(groupby_cols, agg_list, expectedlen, rootdir)
 
         # perform aggregation
         self.aggregate_groups(ct_agg, nr_groups, skip_key,
                                         factor_carray, groupby_cols,
-                                        agg_ops,
-                                        bool_arr=bool_arr,
-                                        agg_method=_agg_method)
+                                        agg_ops, dtype_dict,
+                                        bool_arr=bool_arr)
 
         return ct_agg
 
@@ -425,17 +419,19 @@ class ctable(bcolz.ctable):
                     input_col (string): name of the column to act on
                     agg_op (int): aggregation operation to perform
         '''
-        dtype_list = []
+        dtype_dict = {}
 
         # include all the input columns
         for col in groupby_cols:
-            dtype_list.append((col, self[col].dtype))
+            dtype_dict[col] = self[col].dtype
 
-        agg_cols = []
         agg_ops = []
         op_translation = {
-            'sum': 1,
-            'sum_na': 2
+            'sum': SUM,
+            'count': COUNT,
+            'count_na': COUNT_NA,
+            'count_distinct': COUNT_DISTINCT,
+            'sorted_count_distinct': SORTED_COUNT_DISTINCT,
         }
 
         for agg_info in agg_list:
@@ -444,38 +440,37 @@ class ctable(bcolz.ctable):
                 # straight forward sum (a ['m1', 'm2', ...] parameter)
                 output_col = agg_info
                 input_col = agg_info
-                agg_op = 1
+                agg_op = SUM
             else:
                 # input/output settings [['mnew1', 'm1'], ['mnew2', 'm2], ...]
-                output_col = agg_info[0]
-                input_col = agg_info[1]
+                input_col = agg_info[0]
+                agg_op_input = agg_info[1]
                 if len(agg_info) == 2:
-                    agg_op = 1
+                    output_col = input_col
                 else:
                     # input/output settings [['mnew1', 'm1', 'sum'], ['mnew2', 'm1, 'avg'], ...]
-                    agg_op = agg_info[2]
-                    if agg_op not in op_translation:
-                        raise NotImplementedError(
-                            'Unknown Aggregation Type: ' + unicode(agg_op))
-                    agg_op = op_translation[agg_op]
+                    output_col = agg_info[2]
+                if agg_op_input not in op_translation:
+                    raise NotImplementedError(
+                        'Unknown Aggregation Type: ' + unicode(agg_op_input))
+                agg_op = op_translation[agg_op_input]
 
-            output_col_dtype = self[input_col].dtype
+            dtype_dict[output_col] = self[input_col].dtype
+
             # TODO: check if the aggregation columns is numeric
             # NB: we could build a concatenation for strings like pandas, but I would really prefer to see that as a
             # separate operation
 
             # save output
-            agg_cols.append(output_col)
-            agg_ops.append((input_col, agg_op))
-            dtype_list.append((output_col, output_col_dtype))
+            agg_ops.append((input_col, output_col, agg_op))
 
         # create aggregation table
         ct_agg = bcolz.ctable(
-            np.zeros(0, dtype_list),
+            np.zeros(expectedlen, [('tmp_col_bquery__', np.bool)]),
             expectedlen=expectedlen,
             rootdir=rootdir)
 
-        return ct_agg, dtype_list, agg_ops
+        return ct_agg, dtype_dict, agg_ops
 
     def where_terms(self, term_list):
         """

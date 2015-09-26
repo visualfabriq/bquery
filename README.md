@@ -33,19 +33,19 @@ ctable.groupby(list of groupby columns, agg_list)
 
 The agg_list contains the aggregations operations, which can be:
 - a straight forward sum of a list of columns with a similarly named output: ['m1', 'm2', ...]
-- a list of new columns with input/output names [['mnew1', 'm1'], ['mnew2', 'm2], ...]
-- a list that includes the type of aggregation for each column, i.e. [['mnew1', 'm1', 'sum'], ['mnew2', 'm1, 'avg'], ...]
+- a list of new columns with input names & aggregations [['m1', 'sum'], ['m2', 'count'], ...]
+- a list that includes the type of aggregation and the output of each column, i.e. [['m1', 'sum', 'm1_sum'], ['m1', 'count', 'm1_count'], ...]
 
 Examples:
 
     # groupby column f0, perform a sum on column f2 and keep the output column with the same name
     ct.groupby(['f0'], ['f2'])
 
-    # groupby column f0, perform a sum on column f2 and rename the output column to f2_sum
-    ct.groupby(['f0'], [['f2', 'f2_sum']])
+    # groupby column f0, perform a count on column f2
+    ct.groupby(['f0'], [['f2', 'count']])
 
-    # groupby column f0, with a sum on f2 ('f2_sum') and a sum_na on f2 ('f2_sum_na')
-    ct.groupby(['f0'], [['f2', 'f2_sum', 'sum'], ['f2', 'f2_sum_na', 'sum_na']])
+    # groupby column f0, with a sum on f2 (output to 'f2_sum') and a sum_na on f2 (output to 'f2_sum_na')
+    ct.groupby(['f0'], [['f2', 'sum', 'f2_sum'], ['f2', 'sum_na', 'f2_sum_na']])
 
 If recurrent aggregations are done (typical in a reporting environment), you can speed up aggregations by preparing factorizations of groupby columns:
 
