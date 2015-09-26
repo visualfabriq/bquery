@@ -166,8 +166,7 @@ class ctable(bcolz.ctable):
 
         ct_agg.delcol('tmp_col_bquery__')
 
-    def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None,
-                agg_method='sum'):
+    def groupby(self, groupby_cols, agg_list, bool_arr=None, rootdir=None):
         """
 
         Aggregate the ctable
@@ -209,8 +208,13 @@ class ctable(bcolz.ctable):
             self.make_group_index(factor_list, values_list, groupby_cols,
                                   len(self), bool_arr)
 
+        if bool_arr is None:
+            expectedlen = nr_groups
+        else:
+            expectedlen = nr_groups -1
+
         ct_agg, dtype_dict, agg_ops = \
-            self.create_agg_ctable(groupby_cols, agg_list, nr_groups, rootdir)
+            self.create_agg_ctable(groupby_cols, agg_list, expectedlen, rootdir)
 
         # perform aggregation
         self.aggregate_groups(ct_agg, nr_groups, skip_key,
@@ -439,17 +443,17 @@ class ctable(bcolz.ctable):
                 agg_op = SUM
             else:
                 # input/output settings [['mnew1', 'm1'], ['mnew2', 'm2], ...]
-                output_col = agg_info[0]
-                input_col = agg_info[1]
+                input_col = agg_info[0]
+                agg_op_input = agg_info[1]
                 if len(agg_info) == 2:
-                    agg_op = SUM
+                    output_col = input_col
                 else:
                     # input/output settings [['mnew1', 'm1', 'sum'], ['mnew2', 'm1, 'avg'], ...]
-                    agg_op_input = agg_info[2]
-                    if agg_op_input not in op_translation:
-                        raise NotImplementedError(
-                            'Unknown Aggregation Type: ' + unicode(agg_op_input))
-                    agg_op = op_translation[agg_op_input]
+                    output_col = agg_info[2]
+                if agg_op_input not in op_translation:
+                    raise NotImplementedError(
+                        'Unknown Aggregation Type: ' + unicode(agg_op_input))
+                agg_op = op_translation[agg_op_input]
 
             dtype_dict[output_col] = self[input_col].dtype
 
