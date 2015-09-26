@@ -387,7 +387,7 @@ cdef count_unique_{{ count_unique_type }}(ndarray[{{ count_unique_type }}_t] val
 {% for sum_type in sum_types -%}
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cpdef sum_{{ sum_type }}(carray ca_input, carray ca_factor,
+cpdef agg_{{ sum_type }}(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
         chunk input_chunk, factor_chunk

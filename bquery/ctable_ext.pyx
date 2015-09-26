@@ -602,7 +602,7 @@ cdef count_unique_int32(ndarray[int32_t] values):
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cpdef sum_float64(carray ca_input, carray ca_factor,
+cpdef agg_float64(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
         chunk input_chunk, factor_chunk
@@ -755,7 +755,7 @@ cpdef sum_float64(carray ca_input, carray ca_factor,
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cpdef sum_int32(carray ca_input, carray ca_factor,
+cpdef agg_int32(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
         chunk input_chunk, factor_chunk
@@ -906,7 +906,7 @@ cpdef sum_int32(carray ca_input, carray ca_factor,
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cpdef sum_int64(carray ca_input, carray ca_factor,
+cpdef agg_int64(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
     cdef:
         chunk input_chunk, factor_chunk
