@@ -453,7 +453,6 @@ class ctable(bcolz.ctable):
                         'Unknown Aggregation Type: ' + unicode(agg_op_input))
                 agg_op = op_translation[agg_op_input]
 
-            dtype_dict[output_col] = self[input_col].dtype
 
             # choose output column dtype based on aggregation operation and
             # input column dtype
@@ -467,6 +466,7 @@ class ctable(bcolz.ctable):
             else:
                 output_col_dtype = self[input_col].dtype
 
+            dtype_dict[output_col] = output_col_dtype
 
             # save output
             agg_ops.append((input_col, output_col, agg_op))
