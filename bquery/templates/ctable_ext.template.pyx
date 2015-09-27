@@ -35,6 +35,13 @@ DEF _COUNT_DISTINCT = 3
 
 SORTED_COUNT_DISTINCT = 4
 DEF _SORTED_COUNT_DISTINCT = 4
+
+MEAN = 5
+DEF _MEAN = 5
+
+STDEV = 6
+DEF _STDEV = 6
+
 # ----------------------------------------------------------------------------
 
 # Factorize Section
@@ -398,6 +405,7 @@ cpdef agg_{{ sum_type }}(carray ca_input, carray ca_factor,
         ndarray[npy_{{ sum_type }}] in_buffer
         ndarray[npy_int64] factor_buffer
         ndarray[npy_{{ sum_type }}] out_buffer
+
         ndarray[npy_{{ sum_type }}] last_values
 
         npy_{{ sum_type }} v
@@ -435,7 +443,13 @@ cpdef agg_{{ sum_type }}(carray ca_input, carray ca_factor,
     else:
         factor_buffer = ca_factor.leftover_array
     factor_chunk_row = 0
-    out_buffer = np.zeros(nr_groups, dtype='{{ sum_type }}')
+    # if we're calculating a mean, maintain a buffer tracking the
+    # the size of each group
+    if agg_method == _MEAN:
+        out_buffer = np.zeros(nr_groups, dtype='float64')
+        count_buffer = np.zeros(nr_groups, dtype='int64')
+    else:
+        out_buffer = np.zeros(nr_groups, dtype='{{ sum_type }}')
 
     for input_chunk_nr in range(ca_input.nchunks):
         # fill input buffer
@@ -463,6 +477,11 @@ cpdef agg_{{ sum_type }}(carray ca_input, carray ca_factor,
             if current_index != skip_key:
                 if agg_method == _SUM:
                     out_buffer[current_index] += in_buffer[i]
+                elif agg_method == _MEAN:
+                    # method from Knuth
+                    count_buffer[current_index] += 1
+                    delta = in_buffer[i] - out_buffer[current_index]
+                    out_buffer[current_index] += delta / count_buffer[current_index]
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
@@ -515,6 +534,11 @@ cpdef agg_{{ sum_type }}(carray ca_input, carray ca_factor,
             if current_index != skip_key:
                 if agg_method == _SUM:
                     out_buffer[current_index] += in_buffer[i]
+                elif agg_method == _MEAN:
+                    # method from Knuth
+                    count_buffer[current_index] += 1
+                    delta = in_buffer[i] - out_buffer[current_index]
+                    out_buffer[current_index] += delta / count_buffer[current_index]
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
@@ -742,4 +766,3 @@ cpdef carray_is_in(carray col, set value_set, ndarray boolarr, bint reverse):
             if val in value_set:
                 boolarr[i] = False
             i += 1
-

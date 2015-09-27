@@ -7,7 +7,8 @@ import bcolz
 import tempfile
 import os
 from bquery.ctable_ext import \
-    SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT
+    SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT, \
+    MEAN, STDEV
 
 
 class ctable(bcolz.ctable):
@@ -142,15 +143,16 @@ class ctable(bcolz.ctable):
         # this creates the aggregation columns
         for input_col, output_col, agg_op in output_agg_ops:
 
-            col_dtype = dtype_dict[output_col]
+            input_col_dtype = self[input_col].dtype
+            output_col_dtype = dtype_dict[output_col]
 
-            if col_dtype == np.float64:
+            if input_col_dtype == np.float64:
                 result_array = ctable_ext.agg_float64(self[input_col], factor_carray, nr_groups,
                                            skip_key, agg_method=agg_op)
-            elif col_dtype == np.int64:
+            elif input_col_dtype == np.int64:
                 result_array = ctable_ext.agg_int64(self[input_col], factor_carray, nr_groups,
                                          skip_key, agg_method=agg_op)
-            elif col_dtype == np.int32:
+            elif input_col_dtype == np.int32:
                 result_array = ctable_ext.agg_int32(self[input_col], factor_carray, nr_groups,
                                          skip_key, agg_method=agg_op)
             else:
@@ -396,11 +398,9 @@ class ctable(bcolz.ctable):
         return factor_carray, nr_groups, skip_key
 
     def create_agg_ctable(self, groupby_cols, agg_list, expectedlen, rootdir):
-        '''Create the output table and return a list of tuples describing it
-            and a list of tuples describing aggregation operations to
-            perform. The list of tuples describing the table is identical
-            to the list specifying dtypes used to create the numpy array which
-            is the basis of the ctable.
+        '''Create a container for the output table, a dictionary describing it's
+            columns and a list of tuples describing aggregation
+            operations to perform.
 
         Args:
             groupby_cols (list): a list of columns to groupby over
@@ -411,17 +411,16 @@ class ctable(bcolz.ctable):
         Returns:
             ctable: A table in the correct format for containing the output of
                     the specified aggregation operations.
-            list: (dtype_list) list of tuples describing the output table.
-                   it's of the form (output_col, col_dtype).
-                   output_col (string): name of the output column
-                   col_dtype (numpy.dtype): data type of output column
-            list: (agg_ops) list of tuples of the form: (input_col, agg_op)
+            dict: (dtype_dict) dictionary describing columns to create
+            list: (agg_ops) list of tuples of the form:
+                    (input_col, output_col, agg_op)
                     input_col (string): name of the column to act on
+                    output_col (string): name of the column to output to
                     agg_op (int): aggregation operation to perform
         '''
         dtype_dict = {}
 
-        # include all the input columns
+        # include all the groupby columns
         for col in groupby_cols:
             dtype_dict[col] = self[col].dtype
 
@@ -432,6 +431,7 @@ class ctable(bcolz.ctable):
             'count_na': COUNT_NA,
             'count_distinct': COUNT_DISTINCT,
             'sorted_count_distinct': SORTED_COUNT_DISTINCT,
+            'mean' : MEAN
         }
 
         for agg_info in agg_list:
@@ -457,9 +457,18 @@ class ctable(bcolz.ctable):
 
             dtype_dict[output_col] = self[input_col].dtype
 
+            # choose output column dtype based on aggregation operation and
+            # input column dtype
             # TODO: check if the aggregation columns is numeric
             # NB: we could build a concatenation for strings like pandas, but I would really prefer to see that as a
             # separate operation
+            if agg_op in (COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT):
+                output_col_dtype = np.dtype(np.int64)
+            elif agg_op in (MEAN, STDEV):
+                output_col_dtype = np.dtype(np.float64)
+            else:
+                output_col_dtype = self[input_col].dtype
+
 
             # save output
             agg_ops.append((input_col, output_col, agg_op))
