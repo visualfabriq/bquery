@@ -200,7 +200,6 @@ cdef void _factorize_number_helper(Py_ssize_t iter_range,
         int32_table = <kh_int32_t*> table
 
         for i in range(iter_range):
-            # TODO: Consider indexing directly into the array for efficiency
             element = in_buffer[i]
             k = kh_get_int32(int32_table, element)
             if k != int32_table.n_buckets:
@@ -216,7 +215,6 @@ cdef void _factorize_number_helper(Py_ssize_t iter_range,
         float64_table = <kh_float64_t*> table
 
         for i in range(iter_range):
-            # TODO: Consider indexing directly into the array for efficiency
             element = in_buffer[i]
             k = kh_get_float64(float64_table, element)
             if k != float64_table.n_buckets:
@@ -322,31 +320,6 @@ cpdef factorize(carray carray_, carray labels=None):
         #TODO: check that the input is a string_ dtype type
         labels, reverse = factorize_str(carray_, labels=labels)
     return labels, reverse
-
-# ---------------------------------------------------------------------------
-# Aggregation Section (old)
-@cython.boundscheck(False)
-@cython.wraparound(False)
-def agg_sum_na(iter_):
-    cdef:
-        np.float64_t v, v_cum = 0.0
-
-    for v in iter_:
-        if v == v:  # skip NA values
-            v_cum += v
-
-    return v_cum
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-def agg_sum(iter_):
-    cdef:
-        np.float64_t v, v_cum = 0.0
-
-    for v in iter_:
-        v_cum += v
-
-    return v_cum
 
 # ---------------------------------------------------------------------------
 # Aggregation Section
@@ -476,21 +449,30 @@ cdef count_unique(np.ndarray[numpy_native_number_input] values):
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cpdef agg_float64(carray ca_input, carray ca_factor,
-               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
+cpdef aggregate(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key,
+               np.ndarray[numpy_native_number_input] in_buffer, agg_method):
+
+    # fused type conversion
+    if numpy_native_number_input is np.int64_t:
+       p_dtype = np.int64
+    elif numpy_native_number_input is np.int32_t:
+       p_dtype = np.int32
+    elif numpy_native_number_input is np.float64_t:
+       p_dtype = np.float64
+
     cdef:
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
         Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
 
-        np.ndarray[np.float64_t] in_buffer
         np.ndarray[np.int64_t] factor_buffer
-        np.ndarray[np.float64_t] out_buffer
+        np.ndarray[numpy_native_number_input] out_buffer
 
-        np.ndarray[np.float64_t] last_values
+        np.ndarray[numpy_native_number_input] last_values
 
-        np.float64_t v
+        numpy_native_number_input v
         bint count_distinct_started = 0
         carray num_uniques
 
@@ -508,13 +490,12 @@ cpdef agg_float64(carray ca_input, carray ca_factor,
             end_counts = start_counts + counts[j + 1]
             positions[start_counts:end_counts]
             num_uniques.append(
-                count_unique[np.float64_t](ca_input[positions[start_counts:end_counts]])
+                count_unique[numpy_native_number_input](ca_input[positions[start_counts:end_counts]])
             )
 
         return num_uniques
 
     input_chunk_len = ca_input.chunklen
-    in_buffer = np.empty(input_chunk_len, dtype='float64')
     factor_chunk_len = ca_factor.chunklen
     factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
@@ -528,10 +509,10 @@ cpdef agg_float64(carray ca_input, carray ca_factor,
     # if we're calculating a mean, maintain a buffer tracking the
     # the size of each group
     if agg_method == _MEAN:
-        out_buffer = np.zeros(nr_groups, dtype='float64')
+        out_buffer = np.zeros(nr_groups, dtype=p_dtype)
         count_buffer = np.zeros(nr_groups, dtype='int64')
     else:
-        out_buffer = np.zeros(nr_groups, dtype='float64')
+        out_buffer = np.zeros(nr_groups, dtype=p_dtype)
 
     for input_chunk_nr in range(ca_input.nchunks):
         # fill input buffer
@@ -575,7 +556,7 @@ cpdef agg_float64(carray ca_input, carray ca_factor,
                     v = in_buffer[i]
                     if not count_distinct_started:
                         count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='float64')
+                        last_values = np.zeros(nr_groups, dtype=p_dtype)
                         last_values[0] = v
                         out_buffer[0] = 1
                     else:
@@ -627,343 +608,7 @@ cpdef agg_float64(carray ca_input, carray ca_factor,
                     v = in_buffer[i]
                     if not count_distinct_started:
                         count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='float64')
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
-
-                    last_values[current_index] = v
-                else:
-                    raise NotImplementedError('sumtype not supported')
-
-    # check whether a row has to be removed if it was meant to be skipped
-    if skip_key < nr_groups:
-        np.delete(out_buffer, skip_key)
-
-    return out_buffer
-
-@cython.wraparound(False)
-@cython.boundscheck(False)
-cpdef agg_int32(carray ca_input, carray ca_factor,
-               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
-    cdef:
-        chunk input_chunk, factor_chunk
-        Py_ssize_t input_chunk_nr, input_chunk_len
-        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
-
-        np.ndarray[np.int32_t] in_buffer
-        np.ndarray[np.int64_t] factor_buffer
-        np.ndarray[np.int32_t] out_buffer
-
-        np.ndarray[np.int32_t] last_values
-
-        np.int32_t v
-        bint count_distinct_started = 0
-        carray num_uniques
-
-    count = 0
-    ret = 0
-    reverse = {}
-
-    if agg_method == _COUNT_DISTINCT:
-        num_uniques = carray([], dtype='int64')
-        positions, counts = groupsort_indexer(ca_factor, nr_groups)
-        start_counts = 0
-        end_counts = 0
-        for j in range(len(counts) - 1):
-            start_counts = end_counts
-            end_counts = start_counts + counts[j + 1]
-            positions[start_counts:end_counts]
-            num_uniques.append(
-                count_unique[np.int32_t](ca_input[positions[start_counts:end_counts]])
-            )
-
-        return num_uniques
-
-    input_chunk_len = ca_input.chunklen
-    in_buffer = np.empty(input_chunk_len, dtype='int32')
-    factor_chunk_len = ca_factor.chunklen
-    factor_total_chunks = ca_factor.nchunks
-    factor_chunk_nr = 0
-    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
-    if factor_total_chunks > 0:
-        factor_chunk = ca_factor.chunks[factor_chunk_nr]
-        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-    else:
-        factor_buffer = ca_factor.leftover_array
-    factor_chunk_row = 0
-    # if we're calculating a mean, maintain a buffer tracking the
-    # the size of each group
-    if agg_method == _MEAN:
-        out_buffer = np.zeros(nr_groups, dtype='float64')
-        count_buffer = np.zeros(nr_groups, dtype='int64')
-    else:
-        out_buffer = np.zeros(nr_groups, dtype='int32')
-
-    for input_chunk_nr in range(ca_input.nchunks):
-        # fill input buffer
-        input_chunk = ca_input.chunks[input_chunk_nr]
-        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
-
-        # loop through rows
-        for i in range(input_chunk_len):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
-                elif agg_method == _MEAN:
-                    # method from Knuth
-                    count_buffer[current_index] += 1
-                    delta = in_buffer[i] - out_buffer[current_index]
-                    out_buffer[current_index] += delta / count_buffer[current_index]
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
-
-                    # TODO: Warning: int does not support NA values, is this what we need?
-                    out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='int32')
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
-
-                    last_values[current_index] = v
-                else:
-                    raise NotImplementedError('sumtype not supported')
-
-    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
-    if leftover_elements > 0:
-        # fill input buffer
-        in_buffer = ca_input.leftover_array
-
-        # loop through rows
-        for i in range(leftover_elements):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
-                elif agg_method == _MEAN:
-                    # method from Knuth
-                    count_buffer[current_index] += 1
-                    delta = in_buffer[i] - out_buffer[current_index]
-                    out_buffer[current_index] += delta / count_buffer[current_index]
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
-                    # TODO: Warning: int does not support NA values, is this what we need?
-                    out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='int32')
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
-
-                    last_values[current_index] = v
-                else:
-                    raise NotImplementedError('sumtype not supported')
-
-    # check whether a row has to be removed if it was meant to be skipped
-    if skip_key < nr_groups:
-        np.delete(out_buffer, skip_key)
-
-    return out_buffer
-
-@cython.wraparound(False)
-@cython.boundscheck(False)
-cpdef agg_int64(carray ca_input, carray ca_factor,
-               Py_ssize_t nr_groups, Py_ssize_t skip_key, agg_method=_SUM):
-    cdef:
-        chunk input_chunk, factor_chunk
-        Py_ssize_t input_chunk_nr, input_chunk_len
-        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
-
-        np.ndarray[np.int64_t] in_buffer
-        np.ndarray[np.int64_t] factor_buffer
-        np.ndarray[np.int64_t] out_buffer
-
-        np.ndarray[np.int64_t] last_values
-
-        np.int64_t v
-        bint count_distinct_started = 0
-        carray num_uniques
-
-    count = 0
-    ret = 0
-    reverse = {}
-
-    if agg_method == _COUNT_DISTINCT:
-        num_uniques = carray([], dtype='int64')
-        positions, counts = groupsort_indexer(ca_factor, nr_groups)
-        start_counts = 0
-        end_counts = 0
-        for j in range(len(counts) - 1):
-            start_counts = end_counts
-            end_counts = start_counts + counts[j + 1]
-            positions[start_counts:end_counts]
-            num_uniques.append(
-                count_unique[np.int64_t](ca_input[positions[start_counts:end_counts]])
-            )
-
-        return num_uniques
-
-    input_chunk_len = ca_input.chunklen
-    in_buffer = np.empty(input_chunk_len, dtype='int64')
-    factor_chunk_len = ca_factor.chunklen
-    factor_total_chunks = ca_factor.nchunks
-    factor_chunk_nr = 0
-    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
-    if factor_total_chunks > 0:
-        factor_chunk = ca_factor.chunks[factor_chunk_nr]
-        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-    else:
-        factor_buffer = ca_factor.leftover_array
-    factor_chunk_row = 0
-    # if we're calculating a mean, maintain a buffer tracking the
-    # the size of each group
-    if agg_method == _MEAN:
-        out_buffer = np.zeros(nr_groups, dtype='float64')
-        count_buffer = np.zeros(nr_groups, dtype='int64')
-    else:
-        out_buffer = np.zeros(nr_groups, dtype='int64')
-
-    for input_chunk_nr in range(ca_input.nchunks):
-        # fill input buffer
-        input_chunk = ca_input.chunks[input_chunk_nr]
-        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
-
-        # loop through rows
-        for i in range(input_chunk_len):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
-                elif agg_method == _MEAN:
-                    # method from Knuth
-                    count_buffer[current_index] += 1
-                    delta = in_buffer[i] - out_buffer[current_index]
-                    out_buffer[current_index] += delta / count_buffer[current_index]
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
-
-                    # TODO: Warning: int does not support NA values, is this what we need?
-                    out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='int64')
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
-
-                    last_values[current_index] = v
-                else:
-                    raise NotImplementedError('sumtype not supported')
-
-    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
-    if leftover_elements > 0:
-        # fill input buffer
-        in_buffer = ca_input.leftover_array
-
-        # loop through rows
-        for i in range(leftover_elements):
-
-            # go to next factor buffer if necessary
-            if factor_chunk_row == factor_chunk_len:
-                factor_chunk_nr += 1
-                if factor_chunk_nr < factor_total_chunks:
-                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
-                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
-                else:
-                    factor_buffer = ca_factor.leftover_array
-                factor_chunk_row = 0
-
-            # retrieve index
-            current_index = factor_buffer[factor_chunk_row]
-            factor_chunk_row += 1
-
-            # update value if it's not an invalid index
-            if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
-                elif agg_method == _MEAN:
-                    # method from Knuth
-                    count_buffer[current_index] += 1
-                    delta = in_buffer[i] - out_buffer[current_index]
-                    out_buffer[current_index] += delta / count_buffer[current_index]
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
-                    # TODO: Warning: int does not support NA values, is this what we need?
-                    out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype='int64')
+                        last_values = np.zeros(nr_groups, dtype=p_dtype)
                         last_values[0] = v
                         out_buffer[0] = 1
                     else:
