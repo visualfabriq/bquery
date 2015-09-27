@@ -1,6 +1,6 @@
 import numpy as np
 from numpy cimport ndarray, dtype, npy_intp, npy_int32, \
-    npy_uint64, npy_int64, npy_float64, npy_bool
+    npy_uint64, npy_int64, npy_float64, npy_bool, uint64_t
 
 import cython
 import bcolz as bz
@@ -136,13 +136,11 @@ def factorize_str(carray carray_, carray labels=None):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef void _factorize_{{ factor_type }}_helper(Py_ssize_t iter_range,
-                       Py_ssize_t allocation_size,
-                       ndarray[npy_{{ factor_type }}] in_buffer,
-                       ndarray[npy_uint64] out_buffer,
+                       npy_{{ factor_type }}[:] in_buffer,
+                       uint64_t[:] out_buffer,
                        kh_{{ factor_type }}_t *table,
                        Py_ssize_t * count,
-                       dict reverse,
-                       ):
+                       ) nogil:
     cdef:
         Py_ssize_t i, idx
         int ret
@@ -160,7 +158,6 @@ cdef void _factorize_{{ factor_type }}_helper(Py_ssize_t iter_range,
         else:
             k = kh_put_{{ factor_type }}(table, element, &ret)
             table.vals[k] = idx = count[0]
-            reverse[count[0]] = element
             count[0] += 1
         out_buffer[i] = idx
 
@@ -174,6 +171,8 @@ def factorize_{{ factor_type }}(carray carray_, carray labels=None):
         ndarray[npy_{{ factor_type }}] in_buffer
         ndarray[npy_uint64] out_buffer
         kh_{{ factor_type }}_t *table
+        npy_{{ factor_type }}[:] in_buffer_view
+        uint64_t[:] out_buffer_view
 
     count = 0
     ret = 0
@@ -185,6 +184,7 @@ def factorize_{{ factor_type }}(carray carray_, carray labels=None):
         labels = carray([], dtype='int64', expectedlen=n)
     # in-buffer isn't typed, because cython doesn't support string arrays (?)
     out_buffer = np.empty(chunklen, dtype='uint64')
+    out_buffer_view = out_buffer
     in_buffer = np.empty(chunklen, dtype='{{ factor_type }}')
     table = kh_init_{{ factor_type }}()
 
@@ -192,31 +192,35 @@ def factorize_{{ factor_type }}(carray carray_, carray labels=None):
         chunk_ = carray_.chunks[i]
         # decompress into in_buffer
         chunk_._getitem(0, chunklen, in_buffer.data)
-        _factorize_{{ factor_type }}_helper(chunklen,
-                        carray_.dtype.itemsize + 1,
-                        in_buffer,
-                        out_buffer,
-                        table,
-                        &count,
-                        reverse,
-                        )
+        in_buffer_view = in_buffer
+        with nogil:
+            _factorize_{{ factor_type }}_helper(chunklen,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
         # compress out_buffer into labels
         labels.append(out_buffer.astype(np.int64))
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
-        _factorize_{{ factor_type }}_helper(leftover_elements,
-                          carray_.dtype.itemsize + 1,
-                          carray_.leftover_array,
-                          out_buffer,
-                          table,
-                          &count,
-                          reverse,
-                          )
+        in_buffer_view = carray_.leftover_array
+        with nogil:
+            _factorize_{{ factor_type }}_helper(leftover_elements,
+                    in_buffer_view,
+                    out_buffer_view,
+                    table,
+                    &count
+                    )
 
     # compress out_buffer into labels
     labels.append(out_buffer[:leftover_elements].astype(np.int64))
 
+    for i in range(table.n_buckets):
+        if not kh_exist_{{ factor_type }}(table, i):   # adjust function name to hash-table data-type
+            continue
+        reverse[table.vals[i]] = table.keys[i]
     kh_destroy_{{ factor_type }}(table)
 
     return labels, reverse
