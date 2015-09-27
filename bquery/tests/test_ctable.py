@@ -129,6 +129,7 @@ class TestCtable():
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
+        # no operation is specified in `agg_list`, so `sum` is used by default.
         agg_list = ['f4', 'f5', 'f6']
         num_rows = 2000
 
@@ -165,6 +166,7 @@ class TestCtable():
 
         groupby_cols = ['f0', 'f1', 'f2']
         groupby_lambda = lambda x: [x[0], x[1], x[2]]
+        # no operation is specified in `agg_list`, so `sum` is used by default.
         agg_list = ['f4', 'f5', 'f6']
         num_rows = 2000
 
@@ -778,7 +780,7 @@ class TestCtable():
         # remove the first (text) element for floating point comparison
         result = [list(x[1:]) for x in result_bcolz]
 
-        assert_allclose(result, ref, rtol=1e-04)
+        assert_allclose(result, ref, rtol=1e-10)
 
     def _assert_list_equal(self, a, b):
         assert_list_equal(a, b)

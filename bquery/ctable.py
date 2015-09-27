@@ -173,28 +173,27 @@ class ctable(bcolz.ctable):
 
         groupby_cols: a list of columns to groupby over
         agg_list: the aggregation operations, which can be:
-         - a straight forward sum of a list columns with a
-           similarly named output: ['m1', 'm2', ...]
-         - a list of new column input/output settings
-           [['mnew1', 'm1'], ['mnew2', 'm2], ...]
-         - a list that includes the type of aggregation for each column, i.e.
-           [['mnew1', 'm1', 'sum'], ['mnew2', 'm1, 'avg'], ...]
+         - a list columns names (output has same name and sum is performed)
+           ['m1', 'm2', ...]
+         - a list of lists, each list contains input column name and operation
+           [['m1', 'sum'], ['m2', 'mean'], ...]
+         - a list of lists, each list contains input column name, operation and
+           output column name
+           [['m1', 'sum', 'm1_sum'], ['m1', 'mean', 'm1_mean'], ...]
 
         Currently supported aggregation operations are:
-        - sum
-        - sum_na (that checks for nan values and excludes them)
-        - To be added: mean, mean_na (and perhaps standard deviation etc)
+            - 'sum'
+            - 'count'
+            - 'count_na'
+            - 'count_distinct'
+            - 'sorted_count_distinct', data should have been
+                  previously presorted
+            - 'mean'
 
         boolarr: to be added (filtering the groupby factorization input)
         rootdir: the aggregation ctable rootdir
 
         agg_method: Supported aggregation methods
-                    - 'sum'
-                    - 'count'
-                    - 'count_na'
-                    - 'count_distinct'
-                    - 'sorted_count_distinct', data should have been
-                          previously presorted
 
         """
 
@@ -435,19 +434,23 @@ class ctable(bcolz.ctable):
         for agg_info in agg_list:
 
             if not isinstance(agg_info, list):
-                # straight forward sum (a ['m1', 'm2', ...] parameter)
-                output_col = agg_info
-                input_col = agg_info
+                # example: ['m1', 'm2', ...]
+                # default operation (sum) and default output column name (same is input)
+                output_col_name = agg_info
+                input_col_name = agg_info
                 agg_op = SUM
             else:
-                # input/output settings [['mnew1', 'm1'], ['mnew2', 'm2], ...]
-                input_col = agg_info[0]
+                input_col_name = agg_info[0]
                 agg_op_input = agg_info[1]
+
                 if len(agg_info) == 2:
-                    output_col = input_col
+                    # example: [['m1', 'sum'], ['m2', 'mean], ...]
+                    # default output column name
+                    output_col_name = input_col_name
                 else:
-                    # input/output settings [['mnew1', 'm1', 'sum'], ['mnew2', 'm1, 'avg'], ...]
-                    output_col = agg_info[2]
+                    # example: [['m1', 'sum', 'mnew1'], ['m1, 'mean','mnew2'], ...]
+                    # fully specified
+                    output_col_name = agg_info[2]
                 if agg_op_input not in op_translation:
                     raise NotImplementedError(
                         'Unknown Aggregation Type: ' + unicode(agg_op_input))
@@ -464,12 +467,12 @@ class ctable(bcolz.ctable):
             elif agg_op in (MEAN, STDEV):
                 output_col_dtype = np.dtype(np.float64)
             else:
-                output_col_dtype = self[input_col].dtype
+                output_col_dtype = self[input_col_name].dtype
 
-            dtype_dict[output_col] = output_col_dtype
+            dtype_dict[output_col_name] = output_col_dtype
 
             # save output
-            agg_ops.append((input_col, output_col, agg_op))
+            agg_ops.append((input_col_name, output_col_name, agg_op))
 
         # create aggregation table
         ct_agg = bcolz.ctable(
