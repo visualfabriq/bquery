@@ -157,7 +157,7 @@ def factorize_str(carray carray_, carray labels=None):
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef void _factorize_helper(Py_ssize_t iter_range,
+cdef void _factorize_number_helper(Py_ssize_t iter_range,
                        Py_ssize_t allocation_size,
                        np.ndarray[numpy_native_number_input] in_buffer,
                        np.ndarray[np.uint64_t] out_buffer,
@@ -270,7 +270,7 @@ cdef factorize_number(carray carray_,  numpy_native_number_input typehint, carra
         chunk_ = carray_.chunks[i]
         # decompress into in_buffer
         chunk_._getitem(0, chunklen, in_buffer.data)
-        _factorize_helper[numpy_native_number_input](chunklen,
+        _factorize_number_helper[numpy_native_number_input](chunklen,
                         carray_.dtype.itemsize + 1,
                         in_buffer,
                         out_buffer,
@@ -283,7 +283,7 @@ cdef factorize_number(carray carray_,  numpy_native_number_input typehint, carra
 
     leftover_elements = cython.cdiv(carray_.leftover, carray_.atomsize)
     if leftover_elements > 0:
-        _factorize_helper[numpy_native_number_input](leftover_elements,
+        _factorize_number_helper[numpy_native_number_input](leftover_elements,
                           carray_.dtype.itemsize + 1,
                           carray_.leftover_array,
                           out_buffer,
@@ -320,39 +320,6 @@ cpdef factorize(carray carray_, carray labels=None):
         #TODO: check that the input is a string_ dtype type
         labels, reverse = factorize_str(carray_, labels=labels)
     return labels, reverse
-
-# ---------------------------------------------------------------------------
-# Translate existing arrays
-@cython.wraparound(False)
-@cython.boundscheck(False)
-cpdef translate_int64(carray input_, carray output_, dict lookup, np.int64_t default=-1):
-    cdef:
-        chunk chunk_
-        Py_ssize_t i, chunklen, leftover_elements
-        np.ndarray[np.int64_t] in_buffer
-        np.ndarray[np.int64_t] out_buffer
-
-    chunklen = input_.chunklen
-    out_buffer = np.empty(chunklen, dtype='int64')
-    in_buffer = np.empty(chunklen, dtype='int64')
-
-    for i in range(input_.nchunks):
-        chunk_ = input_.chunks[i]
-        # decompress into in_buffer
-        chunk_._getitem(0, chunklen, in_buffer.data)
-        for i in range(chunklen):
-            element = in_buffer[i]
-            out_buffer[i] = lookup.get(element, default)
-        # compress out_buffer into labels
-        output_.append(out_buffer.astype(np.int64))
-
-    leftover_elements = cython.cdiv(input_.leftover, input_.atomsize)
-    if leftover_elements > 0:
-        in_buffer = input_.leftover_array
-        for i in range(leftover_elements):
-            element = in_buffer[i]
-            out_buffer[i] = lookup.get(element, default)
-        output_.append(out_buffer[:leftover_elements].astype(np.int64))
 
 # ---------------------------------------------------------------------------
 # Aggregation Section (old)
