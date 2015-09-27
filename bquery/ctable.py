@@ -146,20 +146,23 @@ class ctable(bcolz.ctable):
             input_col = self[input_col_name]
             output_col_dtype = dtype_dict[output_col_name]
 
+            input_buffer = np.empty(input_col.chunklen, dtype=input_col.dtype)
+            output_buffer = np.zeros(nr_groups, dtype=output_col_dtype)
+
             try:
-                input_buffer = np.empty(input_col.chunklen, dtype=input_col.dtype)
-                result_array = ctable_ext.aggregate(input_col, factor_carray, nr_groups,
-                                           skip_key, input_buffer, agg_op)
+                ctable_ext.aggregate(input_col, factor_carray, nr_groups,
+                                           skip_key, input_buffer, output_buffer,
+                                           agg_op)
             except:
                 raise NotImplementedError(
                     'Column dtype ({0}) not supported for aggregation yet '
                     '(only int32, int64 & float64)'.format(str(input_col.dtype)))
 
             if bool_arr is not None:
-                result_array = np.delete(result_array, skip_key)
+                output_buffer = np.delete(output_buffer, skip_key)
 
-            ct_agg.addcol(result_array, name=output_col_name)
-            del result_array
+            ct_agg.addcol(output_buffer, name=output_col_name)
+            del output_buffer
 
         ct_agg.delcol('tmp_col_bquery__')
 

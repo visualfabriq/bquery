@@ -451,7 +451,9 @@ cdef count_unique(np.ndarray[numpy_native_number_input] values):
 @cython.boundscheck(False)
 cpdef aggregate(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key,
-               np.ndarray[numpy_native_number_input] in_buffer, agg_method):
+               np.ndarray[numpy_native_number_input] in_buffer,
+               np.ndarray[numpy_native_number_output] out_buffer,
+               agg_method):
 
     # fused type conversion
     if numpy_native_number_input is np.int64_t:
@@ -468,7 +470,6 @@ cpdef aggregate(carray ca_input, carray ca_factor,
         Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
 
         np.ndarray[np.int64_t] factor_buffer
-        np.ndarray[numpy_native_number_input] out_buffer
 
         np.ndarray[numpy_native_number_input] last_values
 
@@ -481,19 +482,17 @@ cpdef aggregate(carray ca_input, carray ca_factor,
     reverse = {}
 
     if agg_method == _COUNT_DISTINCT:
-        num_uniques = carray([], dtype='int64')
         positions, counts = groupsort_indexer(ca_factor, nr_groups)
         start_counts = 0
         end_counts = 0
         for j in range(len(counts) - 1):
             start_counts = end_counts
             end_counts = start_counts + counts[j + 1]
-            positions[start_counts:end_counts]
-            num_uniques.append(
-                count_unique[numpy_native_number_input](ca_input[positions[start_counts:end_counts]])
-            )
 
-        return num_uniques
+            out_buffer[j] = \
+                count_unique[numpy_native_number_input](ca_input[positions[start_counts:end_counts]])
+
+        return
 
     input_chunk_len = ca_input.chunklen
     factor_chunk_len = ca_factor.chunklen
@@ -509,10 +508,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
     # if we're calculating a mean, maintain a buffer tracking the
     # the size of each group
     if agg_method == _MEAN:
-        out_buffer = np.zeros(nr_groups, dtype=p_dtype)
         count_buffer = np.zeros(nr_groups, dtype='int64')
-    else:
-        out_buffer = np.zeros(nr_groups, dtype=p_dtype)
 
     for input_chunk_nr in range(ca_input.nchunks):
         # fill input buffer
@@ -539,7 +535,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
             # update value if it's not an invalid index
             if current_index != skip_key:
                 if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
+                    out_buffer[current_index] += <numpy_native_number_output> in_buffer[i]
                 elif agg_method == _MEAN:
                     # method from Knuth
                     count_buffer[current_index] += 1
@@ -592,7 +588,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
             # update value if it's not an invalid index
             if current_index != skip_key:
                 if agg_method == _SUM:
-                    out_buffer[current_index] += in_buffer[i]
+                    out_buffer[current_index] += <numpy_native_number_output> in_buffer[i]
                 elif agg_method == _MEAN:
                     # method from Knuth
                     count_buffer[current_index] += 1
@@ -622,8 +618,6 @@ cpdef aggregate(carray ca_input, carray ca_factor,
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
         np.delete(out_buffer, skip_key)
-
-    return out_buffer
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
