@@ -195,7 +195,8 @@ class TestCtable():
     def test_groupby_03(self):
         """
         test_groupby_03: Test groupby's aggregations
-                         (groupby single row results into multiple groups)
+                        (groupby single row results into multiple groups)
+                        Groupby type 'sum'
         """
         random.seed(1)
 
@@ -246,6 +247,7 @@ class TestCtable():
         test_groupby_04: Test groupby's aggregation
                              (groupby over multiple rows results
                              into multiple groups)
+                             Groupby type 'sum'
         """
         random.seed(1)
 
@@ -295,6 +297,7 @@ class TestCtable():
     def test_groupby_05(self):
         """
         test_groupby_05: Test groupby's group creation without cache
+        Groupby type 'sum'
         """
         random.seed(1)
 
@@ -357,7 +360,7 @@ class TestCtable():
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
-        agg_list = ['f4', 'f5', 'f6']
+        agg_list = [['f4', 'count'], ['f5', 'count'], ['f6', 'count']]
         num_rows = 2000
 
         # -- Data --
@@ -372,8 +375,7 @@ class TestCtable():
         fact_bcolz.flush()
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
-        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          agg_method='count')
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
         print(result_bcolz)
 
         # Itertools result
@@ -405,7 +407,7 @@ class TestCtable():
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
-        agg_list = ['f4', 'f5', 'f6']
+        agg_list = [['f4', 'count_na'], ['f5', 'count_na'], ['f6', 'count_na']]
         num_rows = 1000
 
         # -- Data --
@@ -420,8 +422,7 @@ class TestCtable():
         fact_bcolz.flush()
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
-        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          agg_method='count_na')
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
         print(result_bcolz)
 
         # Itertools result
@@ -495,7 +496,7 @@ class TestCtable():
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
-        agg_list = ['f4', 'f5', 'f6']
+        agg_list = [['f4', 'count_distinct'], ['f5', 'count_distinct'], ['f6', 'count_distinct']]
         num_rows = 2000
 
         # -- Data --
@@ -512,8 +513,7 @@ class TestCtable():
         fact_bcolz.flush()
 
         fact_bcolz.cache_factor(groupby_cols, refresh=True)
-        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          agg_method='count_distinct')
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
         print(result_bcolz)
         #
         # # Itertools result
@@ -563,7 +563,7 @@ class TestCtable():
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
-        agg_list = ['f4', 'f5', 'f6']
+        agg_list = [['f4', 'sorted_count_distinct'], ['f5', 'sorted_count_distinct'], ['f6', 'sorted_count_distinct']]
         num_rows = 1000
 
         # -- Data --
@@ -580,8 +580,7 @@ class TestCtable():
         fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
         fact_bcolz.flush()
 
-        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list,
-                                          agg_method='sorted_count_distinct')
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
         print(result_bcolz)
 
         # # Itertools result
@@ -609,7 +608,7 @@ class TestCtable():
         random.seed(1)
 
         groupby_cols = []
-        agg_list = ['f1', 'f2']
+        agg_list = [['f1', 'sorted_count_distinct'], ['f2', 'sorted_count_distinct']]
         num_rows = 10
 
         # -- Data --
@@ -628,8 +627,7 @@ class TestCtable():
 
         # -- Bcolz --
         with self.on_disk_data_cleaner(data) as ct:
-            result_bcolz = ct.groupby(groupby_cols, agg_list,
-                                      agg_method='sorted_count_distinct')
+            result_bcolz = ct.groupby(groupby_cols, agg_list)
 
         assert_list_equal([list(x) for x in result_bcolz], [[4, 2]])
 
@@ -643,7 +641,7 @@ class TestCtable():
         random.seed(1)
 
         groupby_cols = []
-        agg_list = ['f1', 'f2']
+        agg_list = [['f1', 'sorted_count_distinct'], ['f2', 'sorted_count_distinct']]
         num_rows = 10
 
         # -- Data --
@@ -663,8 +661,7 @@ class TestCtable():
         with self.on_disk_data_cleaner(data) as ct:
             barr = ct.where_terms( [('f0', 'in', [0])] )
             result_bcolz = ct.groupby(groupby_cols, agg_list,
-                                      bool_arr=barr,
-                                      agg_method='sorted_count_distinct')
+                                      bool_arr=barr)
 
         assert_list_equal([list(x) for x in result_bcolz], [[3, 2]])
 
@@ -675,7 +672,7 @@ class TestCtable():
         random.seed(1)
 
         groupby_cols = []
-        agg_list = ['f1']
+        agg_list = [['f1', 'sorted_count_distinct']]
         num_rows = 10
 
         # -- Data --
@@ -693,8 +690,7 @@ class TestCtable():
 
 
         with self.on_disk_data_cleaner(data) as ct:
-            result_bcolz = ct.groupby(groupby_cols, agg_list,
-                                      agg_method='sorted_count_distinct')
+            result_bcolz = ct.groupby(groupby_cols, agg_list)
 
         assert_list_equal([list(x) for x in result_bcolz], [[4]])
 
@@ -705,7 +701,7 @@ class TestCtable():
         random.seed(1)
 
         groupby_cols = ['f0']
-        agg_list = ['f1']
+        agg_list = [['f1', 'sorted_count_distinct']]
 
         # -- Data --
         data = np.array(
@@ -725,8 +721,7 @@ class TestCtable():
         with self.on_disk_data_cleaner(data) as ct:
             barr = ct.where_terms( [('f0', 'in', [0, 1])] )
             result_bcolz = ct.groupby(groupby_cols, agg_list,
-                                      bool_arr=barr,
-                                      agg_method='sorted_count_distinct')
+                                      bool_arr=barr)
 
         assert_list_equal([list(x) for x in result_bcolz], [[0, 3], [1, 3]])
 
