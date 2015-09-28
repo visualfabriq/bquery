@@ -41,7 +41,8 @@ The `agg_list` contains the aggregation operations, which can be:
 
 ### Supported Operations
 * `sum`
-* `mean`
+* `mean` arithmetic mean (average)
+* `std` standard deviation
 * `count`
 * `count_na`
 * `count_distinct`
@@ -85,10 +86,10 @@ export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 
 Go back to your bquery directory and repeat build and install steps.
 
-```python setup.py build_ext --from-templates --inplace```.
+```python setup.py build_ext --inplace```.
 
 ```
-python setup.py build_ext --from-templates --inplace
+python setup.py build_ext --inplace
 python setup.py install
 ```
 

@@ -175,7 +175,7 @@ class ctable(bcolz.ctable):
 
         groupby_cols: a list of columns to groupby over
         agg_list: the aggregation operations, which can be:
-         - a list columns names (output has same name and sum is performed)
+         - a list of column names (output has same name and sum is performed)
            ['m1', 'm2', ...]
          - a list of lists, each list contains input column name and operation
            [['m1', 'sum'], ['m2', 'mean'], ...]
@@ -195,9 +195,6 @@ class ctable(bcolz.ctable):
 
         boolarr: to be added (filtering the groupby factorization input)
         rootdir: the aggregation ctable rootdir
-
-        agg_method: Supported aggregation methods
-
         """
 
         if not agg_list:
@@ -413,9 +410,9 @@ class ctable(bcolz.ctable):
                     the specified aggregation operations.
             dict: (dtype_dict) dictionary describing columns to create
             list: (agg_ops) list of tuples of the form:
-                    (input_col, output_col, agg_op)
-                    input_col (string): name of the column to act on
-                    output_col (string): name of the column to output to
+                    (input_col_name, output_col_name, agg_op)
+                    input_col_name (string): name of the column to act on
+                    output_col_name (string): name of the column to output to
                     agg_op (int): aggregation operation to perform
         '''
         dtype_dict = {}

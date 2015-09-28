@@ -781,7 +781,7 @@ class TestCtable():
 
     def test_groupby_15(self):
         """
-        test_groupby_14: Groupby type 'std'
+        test_groupby_15: Groupby type 'std'
         """
         random.seed(1)
 
