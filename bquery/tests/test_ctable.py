@@ -11,6 +11,7 @@ import numpy as np
 import math
 import bcolz as bz
 from numpy.testing import assert_array_equal
+from numpy.testing import assert_allclose
 from nose.tools import assert_list_equal
 from nose.plugins.skip import SkipTest
 import itertools as itt
@@ -128,6 +129,7 @@ class TestCtable():
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
+        # no operation is specified in `agg_list`, so `sum` is used by default.
         agg_list = ['f4', 'f5', 'f6']
         num_rows = 2000
 
@@ -164,6 +166,7 @@ class TestCtable():
 
         groupby_cols = ['f0', 'f1', 'f2']
         groupby_lambda = lambda x: [x[0], x[1], x[2]]
+        # no operation is specified in `agg_list`, so `sum` is used by default.
         agg_list = ['f4', 'f5', 'f6']
         num_rows = 2000
 
@@ -724,6 +727,108 @@ class TestCtable():
                                       bool_arr=barr)
 
         assert_list_equal([list(x) for x in result_bcolz], [[0, 3], [1, 3]])
+
+    def test_groupby_14(self):
+        """
+        test_groupby_14: Groupby type 'mean'
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = [['f4', 'mean'], ['f5', 'mean'], ['f6', 'mean']]
+        agg_lambda = lambda x: [x[4], x[5], x[6]]
+        num_rows = 2000
+
+        # -- Data --
+        g = self.gen_almost_unique_row(num_rows)
+        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+
+        # -- Bcolz --
+        print('--> Bcolz')
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+        fact_bcolz.flush()
+
+        fact_bcolz.cache_factor(groupby_cols, refresh=True)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
+        print(result_bcolz)
+
+        # Itertools result
+        print('--> Itertools')
+        result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        uniquekeys = result_itt['uniquekeys']
+        print(uniquekeys)
+
+        ref = []
+        for item in result_itt['groups']:
+            f4 = []
+            f5 = []
+            f6 = []
+            for row in item:
+                f0 = groupby_lambda(row)
+                f4.append(row[4])
+                f5.append(row[5])
+                f6.append(row[6])
+
+            ref.append([np.mean(f4), np.mean(f5), np.mean(f6)])
+
+        # remove the first (text) element for floating point comparison
+        result = [list(x[1:]) for x in result_bcolz]
+
+        assert_allclose(result, ref, rtol=1e-10)
+
+    def test_groupby_15(self):
+        """
+        test_groupby_15: Groupby type 'std'
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = [['f4', 'std'], ['f5', 'std'], ['f6', 'std']]
+        agg_lambda = lambda x: [x[4], x[5], x[6]]
+        num_rows = 2000
+
+        # -- Data --
+        g = self.gen_almost_unique_row(num_rows)
+        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+
+        # -- Bcolz --
+        print('--> Bcolz')
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+        fact_bcolz.flush()
+
+        fact_bcolz.cache_factor(groupby_cols, refresh=True)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
+        print(result_bcolz)
+
+        # Itertools result
+        print('--> Itertools')
+        result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        uniquekeys = result_itt['uniquekeys']
+        print(uniquekeys)
+
+        ref = []
+        for item in result_itt['groups']:
+            f4 = []
+            f5 = []
+            f6 = []
+            for row in item:
+                f0 = groupby_lambda(row)
+                f4.append(row[4])
+                f5.append(row[5])
+                f6.append(row[6])
+
+            ref.append([np.std(f4), np.std(f5), np.std(f6)])
+
+        # remove the first (text) element for floating point comparison
+        result = [list(x[1:]) for x in result_bcolz]
+
+        assert_allclose(result, ref, rtol=1e-10)
 
     def _assert_list_equal(self, a, b):
         assert_list_equal(a, b)

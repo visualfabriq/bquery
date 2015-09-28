@@ -29,14 +29,26 @@ Bquery subclasses the ctable from bcolz, meaning that all original ctable functi
 
 A groupby with aggregation is easy to perform:
 
-ctable.groupby(list of groupby columns, agg_list)
+    ctable.groupby(list_of_groupby_columns, agg_list)
 
-The agg_list contains the aggregations operations, which can be:
-- a straight forward sum of a list of columns with a similarly named output: ['m1', 'm2', ...]
-- a list of new columns with input names & aggregations [['m1', 'sum'], ['m2', 'count'], ...]
-- a list that includes the type of aggregation and the output of each column, i.e. [['m1', 'sum', 'm1_sum'], ['m1', 'count', 'm1_count'], ...]
+The `agg_list` contains the aggregation operations, which can be:
+* a straight forward list of columns (a sum is performed on each and stored in a column of the same name)
+    - `['m1', 'm2', ...]`
+- a list of lists where each list gives input column name and operation)
+    - `[['m1', 'sum'], ['m2', 'count'], ...]`
+- a list of lists where each list additionally includes an output column name
+    - `[['m1', 'sum', 'm1_sum'], ['m1', 'count', 'm1_count'], ...]`
 
-Examples:
+### Supported Operations
+* `sum`
+* `mean` arithmetic mean (average)
+* `std` standard deviation
+* `count`
+* `count_na`
+* `count_distinct`
+* `sorted_count_distinct`
+
+### Examples
 
     # groupby column f0, perform a sum on column f2 and keep the output column with the same name
     ct.groupby(['f0'], ['f2'])
@@ -44,8 +56,9 @@ Examples:
     # groupby column f0, perform a count on column f2
     ct.groupby(['f0'], [['f2', 'count']])
 
-    # groupby column f0, with a sum on f2 (output to 'f2_sum') and a sum_na on f2 (output to 'f2_sum_na')
-    ct.groupby(['f0'], [['f2', 'sum', 'f2_sum'], ['f2', 'sum_na', 'f2_sum_na']])
+    # groupby column f0, with a sum on f2 (output to 'f2_sum') and a mean on f2 (output to 'f2_mean')
+    ct.groupby(['f0'], [['f2', 'sum', 'f2_sum'], ['f2', 'mean', 'f2_mean']])
+
 
 If recurrent aggregations are done (typical in a reporting environment), you can speed up aggregations by preparing factorizations of groupby columns:
 
@@ -72,15 +85,11 @@ export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
 ```
 
 Go back to your bquery directory and repeat build and install steps.
-Note: ```bquery/templates/ctable_ext.template.pyx``` will be used as 
-template to generate the source file ```bquery/ctable_ext.pyx``` used 
-by the cython compiler, if you are developing new features remember to write 
-those modifications in the template file, ```bquery/ctable_ext.pyx```
-will be overwritten each time you run 
-```python setup.py build_ext --from-templates --inplace```. 
+
+```python setup.py build_ext --inplace```.
 
 ```
-python setup.py build_ext --from-templates --inplace
+python setup.py build_ext --inplace
 python setup.py install
 ```
 
