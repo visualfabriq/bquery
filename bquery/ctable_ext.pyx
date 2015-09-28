@@ -505,10 +505,12 @@ cpdef aggregate(carray ca_input, carray ca_factor,
     else:
         factor_buffer = ca_factor.leftover_array
     factor_chunk_row = 0
-    # if we're calculating a mean, maintain a buffer tracking the
-    # the size of each group
-    if agg_method == _MEAN:
+
+    # create special buffers for complex operations
+    if agg_method == _MEAN or agg_method == _STDEV:
         count_buffer = np.zeros(nr_groups, dtype='int64')
+    if agg_method == _STDEV:
+        mean_buffer = np.zeros(nr_groups, dtype='float64')
 
     for input_chunk_nr in range(ca_input.nchunks):
         # fill input buffer
@@ -541,6 +543,12 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                     count_buffer[current_index] += 1
                     delta = in_buffer[i] - out_buffer[current_index]
                     out_buffer[current_index] += delta / count_buffer[current_index]
+                elif agg_method == _STDEV:
+                    count_buffer[current_index] += 1
+                    delta = in_buffer[i] - mean_buffer[current_index]
+                    mean_buffer[current_index] += delta / count_buffer[current_index]
+                    # M2 = M2 + delta*(x - mean)
+                    out_buffer[current_index] += delta * (in_buffer[i] - mean_buffer[current_index])
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
@@ -594,6 +602,12 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                     count_buffer[current_index] += 1
                     delta = in_buffer[i] - out_buffer[current_index]
                     out_buffer[current_index] += delta / count_buffer[current_index]
+                elif agg_method == _STDEV:
+                    count_buffer[current_index] += 1
+                    delta = in_buffer[i] - mean_buffer[current_index]
+                    mean_buffer[current_index] += delta / count_buffer[current_index]
+                    # M2 = M2 + delta*(x - mean)
+                    out_buffer[current_index] += delta * (in_buffer[i] - mean_buffer[current_index])
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
@@ -614,6 +628,10 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                     last_values[current_index] = v
                 else:
                     raise NotImplementedError('sumtype not supported')
+
+    if agg_method == _STDEV:
+        for i in range(len(out_buffer)):
+            out_buffer[i] = np.sqrt(out_buffer[i] / (count_buffer[i]))
 
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:

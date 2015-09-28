@@ -153,10 +153,12 @@ class ctable(bcolz.ctable):
                 ctable_ext.aggregate(input_col, factor_carray, nr_groups,
                                            skip_key, input_buffer, output_buffer,
                                            agg_op)
-            except:
+            except TypeError:
                 raise NotImplementedError(
                     'Column dtype ({0}) not supported for aggregation yet '
                     '(only int32, int64 & float64)'.format(str(input_col.dtype)))
+            except Exception as e:
+                raise e
 
             if bool_arr is not None:
                 output_buffer = np.delete(output_buffer, skip_key)
@@ -188,7 +190,8 @@ class ctable(bcolz.ctable):
             - 'count_distinct'
             - 'sorted_count_distinct', data should have been
                   previously presorted
-            - 'mean'
+            - 'mean', arithmetic mean (average)
+            - 'std', standard deviation
 
         boolarr: to be added (filtering the groupby factorization input)
         rootdir: the aggregation ctable rootdir
@@ -428,7 +431,8 @@ class ctable(bcolz.ctable):
             'count_na': COUNT_NA,
             'count_distinct': COUNT_DISTINCT,
             'sorted_count_distinct': SORTED_COUNT_DISTINCT,
-            'mean' : MEAN
+            'mean' : MEAN,
+            'std' : STDEV
         }
 
         for agg_info in agg_list:
