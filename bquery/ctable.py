@@ -207,6 +207,10 @@ class ctable(bcolz.ctable):
             self.make_group_index(factor_list, values_list, groupby_cols,
                                   len(self), bool_arr)
 
+        # check if the bool_arr actually filters
+        if sum(bool_arr) == len(bool_arr):
+            bool_arr = None
+
         if bool_arr is None:
             expectedlen = nr_groups
         else:
