@@ -16,6 +16,13 @@ import tempfile
 import os
 import time
 
+try:
+    # Python 2
+    from itertools import izip
+except ImportError:
+    # Python 3
+    izip = zip
+
 t_elapsed = 0.0
 @contextlib.contextmanager
 def ctime(message=None):
@@ -43,7 +50,7 @@ n_rows = 1000000
 print('Rows: ', n_rows)
 
 # -- data
-z = np.fromiter(((a, b, x, y) for a, b, x, y in itt.izip(ga, gb, gx, gy)),
+z = np.fromiter(((a, b, x, y) for a, b, x, y in izip(ga, gb, gx, gy)),
                 dtype='S2,S2,i8,i8', count=n_rows)
 
 ct = bquery.ctable(z, rootdir=rootdir, )

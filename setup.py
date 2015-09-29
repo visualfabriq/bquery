@@ -94,25 +94,13 @@ else:
 ########### Project specific command line options ###########
 
 class bquery_build_ext(build_ext):
-    user_options = build_ext.user_options + \
-        [
-        ('from-templates', None,
-         "rebuild project from code generation templates"),
-        ]
+    user_options = build_ext.user_options
 
     def initialize_options(self):
         self.from_templates = False
         build_ext.initialize_options(self)
 
     def run(self):
-        if self.from_templates:
-            try:
-                import jinja2
-            except:
-                exit_with_error(
-                    "You need the python package jinja2 to rebuild the " + \
-                    "extension from the templates")
-            exec(open("bquery/templates/run_templates.py").read())
 
         build_ext.run(self)
 
