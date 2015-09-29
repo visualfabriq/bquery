@@ -208,7 +208,7 @@ class ctable(bcolz.ctable):
                                   len(self), bool_arr)
 
         # check if the bool_arr actually filters
-        if sum(bool_arr) == len(bool_arr):
+        if bool_arr is not None and sum(bool_arr) == len(bool_arr):
             bool_arr = None
 
         if bool_arr is None:
