@@ -830,3 +830,44 @@ cpdef carray_is_in(carray col, set value_set, np.ndarray boolarr, bint reverse):
             if val in value_set:
                 boolarr[i] = False
             i += 1
+
+# Translate existing arrays
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cpdef translate_int64(carray input_, carray output_, dict lookup, np.npy_int64 default=-1):
+    """
+    used for internal vf functions; creates a factorized array from an existing lookup dictionary
+
+    :param input_:
+    :param output_:
+    :param lookup:
+    :param default:
+    :return:
+    """
+    cdef:
+        chunk chunk_
+        Py_ssize_t i, chunklen, leftover_elements
+        np.ndarray[np.npy_int64] in_buffer
+        np.ndarray[np.npy_int64] out_buffer
+
+    chunklen = input_.chunklen
+    out_buffer = np.empty(chunklen, dtype='int64')
+    in_buffer = np.empty(chunklen, dtype='int64')
+
+    for i in range(input_.nchunks):
+        chunk_ = input_.chunks[i]
+        # decompress into in_buffer
+        chunk_._getitem(0, chunklen, in_buffer.data)
+        for i in range(chunklen):
+            element = in_buffer[i]
+            out_buffer[i] = lookup.get(element, default)
+        # compress out_buffer into labels
+        output_.append(out_buffer.astype(np.int64))
+
+    leftover_elements = cython.cdiv(input_.leftover, input_.atomsize)
+    if leftover_elements > 0:
+        in_buffer = input_.leftover_array
+        for i in range(leftover_elements):
+            element = in_buffer[i]
+            out_buffer[i] = lookup.get(element, default)
+        output_.append(out_buffer[:leftover_elements].astype(np.int64))
