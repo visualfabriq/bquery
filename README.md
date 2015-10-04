@@ -1,6 +1,8 @@
 bquery
 ======
 
+![bquery logo](bquery.png)
+
 A query and aggregation framework for Bcolz.
 
 Bcolz is a light weight package that provides columnar, chunked data containers that can be compressed either in-memory and on-disk. that are compressed by default not only for reducing memory/disk storage, but also to improve I/O speed. It excels at storing and sequentially accessing large, numerical data sets.
