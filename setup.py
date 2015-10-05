@@ -147,5 +147,6 @@ The bquery framework provides methods to perform query and aggregation operation
         test=tests_require
     ),
     packages=find_packages(),
-    package_data={'bquery': ['ctable_ext.pxd']}
+    package_data={'bquery': ['ctable_ext.pxd']},
+    zip_safe=True
 )

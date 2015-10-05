@@ -1,0 +1,7 @@
+include MANIFEST.in
+include *.txt *.rst *.md
+include setup.py
+
+recursive-include bquery *.py *.pyx *.pxd *.c *.h
+recursive-include bquery/tests *.py
+recursive-include bquery/benchmarks *.py *.md *.ipynb
