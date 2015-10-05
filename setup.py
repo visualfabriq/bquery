@@ -80,19 +80,18 @@ if os.getenv('TRAVIS') and os.getenv('CI') and v[0:2] == (2, 7):
 
 setup(
     name="bquery",
-    use_scm_version={
-        'version_scheme': 'guess-next-dev',
-        'local_scheme': 'dirty-tag',
-        'write_to': 'bquery/version.py'
-    },
+    version='0.1.0',
+    # version={
+    #     'version_scheme': 'guess-next-dev',
+    #     'local_scheme': 'dirty-tag',
+    #     'write_to': 'bquery/version.py'
+    # },
     description='A query and aggregation framework for Bcolz',
     long_description="""\
 
-A query and aggregation framework for Bcolz.
-
 Bcolz is a light weight package that provides columnar, chunked data containers that can be compressed either in-memory and on-disk. that are compressed by default not only for reducing memory/disk storage, but also to improve I/O speed. It excels at storing and sequentially accessing large, numerical data sets.
 
-The bquery framework provides methods to perform query and aggregation operations on bcolz containers, as well as accelerate these operations by pre-processing possible groupby columns. Currently the real-life performance of sum aggregations using on-disk bcolz queries is normally between 1.5 and 3.0 times slower than similar in-memory Pandas aggregations. See the Benchmark paragraph below.
+The bquery framework provides methods to perform query and aggregation operations on bcolz containers, as well as accelerate these operations by pre-processing possible groupby columns. Currently the real-life performance of sum aggregations using on-disk bcolz queries is normally between 1.5 and 3.0 times slower than similar in-memory Pandas aggregations.
 
     """,
     classifiers=[
