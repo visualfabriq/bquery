@@ -55,7 +55,7 @@ target/
 
 # other
 bquery/ctable_ext.c
-bcolz
+bquery/version.py
 bquery/benchmarks/vb_suite/benchmarks.db
 bquery/benchmarks/vb_suite/source
 
