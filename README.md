@@ -72,23 +72,11 @@ If the table is changed, the factorization has to be re-performed. This is not t
 Building & Installing
 ---------------------
 
-To be able to build, the package bcolz with ```carray_ext.pxd``` at least version 0.8.0 is needed.
-
-Clone bcolz build it and install it (at the moment both steps needed)
+Clone bquery to build and install it
 
 ```
-git clone https://github.com/blosc/bcolz.git
-cd bcolz
-python setup.py build_ext --inplace
-cd ..
-export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
-```
-
-Go back to your bquery directory and repeat build and install steps.
-
-```python setup.py build_ext --inplace```.
-
-```
+git clone https://github.com/visualfabriq/bquery.git
+cd bquery
 python setup.py build_ext --inplace
 python setup.py install
 ```

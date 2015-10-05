@@ -1,20 +1,12 @@
 language: python
 python:
-# TODO: should python 2.6 be supported?
-#- 2.6
 - 2.7
-# TODO: should python 3.4 be supported?
 - 3.4
 install:
 - pip install --install-option='--no-cython-compile' cython
 - pip install numpy
-- pip install jinja2
-- git clone https://github.com/blosc/bcolz.git
-- cd bcolz
+- pip install bcolz
 - python setup.py build_ext --inplace
-- cd ..
-- export PYTHONPATH=$(pwd)/bcolz:${PYTHONPATH}
-- python setup.py build_ext --from-templates --inplace
 script:
 - nosetests bquery
 notifications:
