@@ -124,6 +124,10 @@ def factorize_str(carray carray_, carray labels=None):
     for in_buffer in bz.iterblocks(carray_):
         len_in_buffer = len(in_buffer)
 
+        # should only happen on leftovers
+        if(len_in_buffer != chunklen):
+            out_buffer = np.empty(len_in_buffer, dtype='uint64')
+
         _factorize_str_helper(len_in_buffer,
                         carray_.dtype.itemsize + 1,
                         in_buffer,
@@ -134,7 +138,7 @@ def factorize_str(carray carray_, carray labels=None):
                         )
 
         # TODO: need to use an explicit loop here for speed?
-        labels.append(out_buffer[:len_in_buffer].astype(np.int64))
+        labels.append(out_buffer)
 
     kh_destroy_str(table)
 
@@ -250,6 +254,11 @@ cdef factorize_number(carray carray_,  numpy_native_number_input typehint, carra
 
     for in_buffer in bz.iterblocks(carray_):
         len_in_buffer = len(in_buffer)
+
+        # should only happen on leftovers
+        if(len_in_buffer != chunklen):
+            out_buffer = np.empty(len_in_buffer, dtype='uint64')
+
         _factorize_number_helper[numpy_native_number_input](len_in_buffer,
                         carray_.dtype.itemsize + 1,
                         in_buffer,
@@ -262,7 +271,7 @@ cdef factorize_number(carray carray_,  numpy_native_number_input typehint, carra
 
         # TODO: need to use an explicit loop here for speed?
         # compress out_buffer into labels
-        labels.append(out_buffer[:len_in_buffer].astype(np.int64))
+        labels.append(out_buffer)
 
     if numpy_native_number_input is np.int64_t:
         kh_destroy_int64(<kh_int64_t*>table)
