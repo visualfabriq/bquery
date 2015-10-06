@@ -430,7 +430,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
 
     cdef:
         Py_ssize_t in_buffer_len, factor_buffer_len
-        Py_ssize_t factor_chunk_nr, factor_chunk_row
+        Py_ssize_t factor_chunk_nr, factor_chunk_row, factor_total_chunks
         Py_ssize_t current_index, i, j, end_counts, start_counts
 
         np.ndarray[np.int64_t] factor_buffer
@@ -459,6 +459,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
 
         return
 
+    factor_total_chunks = ca_factor.nchunks
     factor_chunk_nr = 0
     factor_buffer = next(iter_ca_factor)
     factor_buffer_len = len(factor_buffer)
@@ -470,65 +471,64 @@ cpdef aggregate(carray ca_input, carray ca_factor,
     if agg_method == _STDEV:
         mean_buffer = np.zeros(nr_groups, dtype='float64')
 
-    try:
-        for in_buffer in bz.iterblocks(ca_input):
-            len_in_buffer = len(in_buffer)
+    for in_buffer in bz.iterblocks(ca_input):
+        len_in_buffer = len(in_buffer)
 
-            # loop through rows
-            for i in range(len_in_buffer):
+        # loop through rows
+        for i in range(len_in_buffer):
 
-                # go to next factor buffer if necessary
+            # go to next factor buffer if necessary
+            # TODO: make chunk sizes the same for ca_factor
+            # and ca_input, to eliminate separate iteration
+            if (factor_chunk_row == factor_buffer_len
+                and factor_chunk_nr < factor_total_chunks):
+                factor_chunk_nr += 1
+                factor_buffer = next(iter_ca_factor)
+                factor_buffer_len = len(factor_buffer)
+                factor_chunk_row = 0
 
-                if factor_chunk_row == factor_buffer_len:
-                    factor_chunk_nr += 1
-                    factor_buffer = next(iter_ca_factor)
-                    factor_buffer_len = len(factor_buffer)
-                    factor_chunk_row = 0
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
 
-                # retrieve index
-                current_index = factor_buffer[factor_chunk_row]
-                factor_chunk_row += 1
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                if agg_method == _SUM:
+                    out_buffer[current_index] += <numpy_native_number_output> in_buffer[i]
+                elif agg_method == _MEAN:
+                    # method from Knuth
+                    count_buffer[current_index] += 1
+                    delta = in_buffer[i] - out_buffer[current_index]
+                    out_buffer[current_index] += delta / count_buffer[current_index]
+                elif agg_method == _STDEV:
+                    count_buffer[current_index] += 1
+                    delta = in_buffer[i] - mean_buffer[current_index]
+                    mean_buffer[current_index] += delta / count_buffer[current_index]
+                    # M2 = M2 + delta*(x - mean)
+                    out_buffer[current_index] += delta * (in_buffer[i] - mean_buffer[current_index])
+                elif agg_method == _COUNT:
+                    out_buffer[current_index] += 1
+                elif agg_method == _COUNT_NA:
 
-                # update value if it's not an invalid index
-                if current_index != skip_key:
-                    if agg_method == _SUM:
-                        out_buffer[current_index] += <numpy_native_number_output> in_buffer[i]
-                    elif agg_method == _MEAN:
-                        # method from Knuth
-                        count_buffer[current_index] += 1
-                        delta = in_buffer[i] - out_buffer[current_index]
-                        out_buffer[current_index] += delta / count_buffer[current_index]
-                    elif agg_method == _STDEV:
-                        count_buffer[current_index] += 1
-                        delta = in_buffer[i] - mean_buffer[current_index]
-                        mean_buffer[current_index] += delta / count_buffer[current_index]
-                        # M2 = M2 + delta*(x - mean)
-                        out_buffer[current_index] += delta * (in_buffer[i] - mean_buffer[current_index])
-                    elif agg_method == _COUNT:
+                    v = in_buffer[i]
+                    if v == v:  # skip NA values
                         out_buffer[current_index] += 1
-                    elif agg_method == _COUNT_NA:
-
-                        v = in_buffer[i]
-                        if v == v:  # skip NA values
-                            out_buffer[current_index] += 1
-                    elif agg_method == _SORTED_COUNT_DISTINCT:
-                        v = in_buffer[i]
-                        if not count_distinct_started:
-                            count_distinct_started = 1
-                            last_values = np.zeros(nr_groups, dtype=p_dtype)
-                            last_values[0] = v
-                            out_buffer[0] = 1
-                        else:
-                            if v != last_values[current_index]:
-                                out_buffer[current_index] += 1
-
-                        last_values[current_index] = v
+                elif agg_method == _SORTED_COUNT_DISTINCT:
+                    v = in_buffer[i]
+                    if not count_distinct_started:
+                        count_distinct_started = 1
+                        last_values = np.zeros(nr_groups, dtype=p_dtype)
+                        last_values[0] = v
+                        out_buffer[0] = 1
                     else:
-                        raise NotImplementedError('sumtype not supported')
-    except StopIteration:
-        pass
-    finally:
-        del iter_ca_factor
+                        if v != last_values[current_index]:
+                            out_buffer[current_index] += 1
+
+                    last_values[current_index] = v
+                else:
+                    raise NotImplementedError('sumtype not supported')
+
+    del iter_ca_factor
 
     if agg_method == _STDEV:
         for i in range(len(out_buffer)):
@@ -564,30 +564,29 @@ cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_
 
     out_buffer = np.zeros(nr_groups, dtype=ca_input.dtype)
 
-    try:
-        for in_buffer in bz.iterblocks(ca_input):
-            len_in_buffer = len(in_buffer)
+    for in_buffer in bz.iterblocks(ca_input):
+        len_in_buffer = len(in_buffer)
 
-            for i in range(len_in_buffer):
+        for i in range(len_in_buffer):
 
-                # go to next factor buffer if necessary
-                if factor_chunk_row == factor_buffer_len:
-                    factor_chunk_nr += 1
-                    factor_buffer = next(iter_ca_factor)
-                    factor_buffer_len = len(factor_buffer)
-                    factor_chunk_row = 0
+            # go to next factor buffer if necessary
+            if (factor_chunk_row == factor_buffer_len
+                and factor_chunk_nr < factor_total_chunks):
 
-                # retrieve index
-                current_index = factor_buffer[factor_chunk_row]
-                factor_chunk_row += 1
+                factor_chunk_nr += 1
+                factor_buffer = next(iter_ca_factor)
+                factor_buffer_len = len(factor_buffer)
+                factor_chunk_row = 0
 
-                # update value if it's not an invalid index
-                if current_index != skip_key:
-                    out_buffer[current_index] = in_buffer[i]
-    except StopIteration:
-        pass
-    finally:
-        del iter_ca_factor
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                out_buffer[current_index] = in_buffer[i]
+
+    del iter_ca_factor
 
     # check whether a row has to be fixed
     if skip_key < nr_groups:
