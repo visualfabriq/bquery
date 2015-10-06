@@ -1,4 +1,3 @@
 cython
 numpy
-bcolz>=0.8.0
-jinja2
+bcolz>=0.11.3
