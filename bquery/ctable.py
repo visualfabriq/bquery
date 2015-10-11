@@ -397,8 +397,6 @@ class ctable(bcolz.ctable):
             # if we shouldn't skip a row, set it at the first row after the total number of groups
             skip_key = nr_groups
 
-        print '***', values, nr_groups, skip_key
-
         return factor_carray, nr_groups, skip_key
 
     def create_agg_ctable(self, groupby_cols, agg_list, expectedlen, rootdir):
