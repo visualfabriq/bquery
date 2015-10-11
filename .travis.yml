@@ -1,13 +1,29 @@
+sudo: false
 language: python
 python:
 - 2.7
 - 3.4
 install:
-- pip install --install-option='--no-cython-compile' cython
-- pip install numpy
-- pip install bcolz
-- python setup.py build_ext --inplace
+  # Install conda
+  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update conda
+
+  # Install dependencies
+  - conda create -n bcolz_env python=$TRAVIS_PYTHON_VERSION numpy cython nose coverage
+  - source activate bcolz_env
+  - pip install bcolz
+  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then conda install mock; fi
+
+  # build bquery
+  - python setup.py build_ext --inplace
+
 script:
-- nosetests bquery
+  - nosetests bquery
+
 notifications:
-email: false
+  email: false
+
+
