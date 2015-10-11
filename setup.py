@@ -135,8 +135,8 @@ The bquery framework provides methods to perform query and aggregation operation
         'cython>=0.22',
         'numpy>=1.7',
         'setuptools>18.0',
-        'setuptools-scm>1.5.4',
-        # 'bcolz>=1.1.3'
+        # 'setuptools-scm>1.5.4',
+        'bcolz>=1.1.3'
     ],
     tests_require=tests_require,
     extras_require=dict(
