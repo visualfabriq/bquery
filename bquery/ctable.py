@@ -131,6 +131,7 @@ class ctable(bcolz.ctable):
 
         # this creates the groupby columns
         for col in groupby_cols:
+
             result_array = ctable_ext.groupby_value(self[col], factor_carray,
                                                   nr_groups, skip_key)
 
@@ -208,7 +209,7 @@ class ctable(bcolz.ctable):
                                   len(self), bool_arr)
 
         # check if the bool_arr actually filters
-        if bool_arr is not None and sum(bool_arr) == len(bool_arr):
+        if bool_arr is not None and np.all(bool_arr):
             bool_arr = None
 
         if bool_arr is None:
