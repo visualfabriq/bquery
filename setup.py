@@ -50,7 +50,7 @@ inc_dirs = [abspath('bquery')]
 lib_dirs = []
 libs = []
 def_macros = []
-sources = [abspath('bquery/ctable_ext.pyx')]
+sources = ['bquery/ctable_ext.pyx']
 
 optional_libs = []
 
