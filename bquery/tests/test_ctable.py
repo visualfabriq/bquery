@@ -1,10 +1,8 @@
-from nose.plugins.attrib import attr
 import bquery
 import os
 import random
 import itertools
 import tempfile
-import numpy as np
 import shutil
 import nose
 import numpy as np
@@ -13,9 +11,11 @@ import bcolz as bz
 from numpy.testing import assert_array_equal
 from numpy.testing import assert_allclose
 from nose.tools import assert_list_equal
+from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 import itertools as itt
 from contextlib import contextmanager
+
 
 class TestCtable():
     @contextmanager
@@ -32,7 +32,6 @@ class TestCtable():
         shutil.rmtree(self.rootdir)
         self.rootdir = None
 
-
     def setup(self):
         print('TestCtable.setup')
         self.rootdir = None
@@ -48,10 +47,10 @@ class TestCtable():
                                 'b', 'b', 'b',
                                 'c', 'c', 'c', 'c', 'c'])
         pool_b = itertools.cycle([0.0, 0.0,
-                                  1.0,1.0,1.0,
-                                  3.0,3.0,3.0,3.0,3.0])
-        pool_c = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
-        pool_d = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
+                                  1.0, 1.0, 1.0,
+                                  3.0, 3.0, 3.0, 3.0, 3.0])
+        pool_c = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
+        pool_d = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
         for _ in range(N):
             d = (
                 next(pool),
@@ -69,13 +68,13 @@ class TestCtable():
                                 'b', 'b', 'b',
                                 'c', 'c', 'c', 'c', 'c'])
         pool_b = itertools.cycle([0.0, 0.1,
-                                  1.0,1.0,1.0,
-                                  3.0,3.0,3.0,3.0,3.0])
-        pool_c = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
-        pool_d = itertools.cycle([0,0,1,1,1,3,3,3,3,3])
+                                  1.0, 1.0, 1.0,
+                                  3.0, 3.0, 3.0, 3.0, 3.0])
+        pool_c = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
+        pool_d = itertools.cycle([0, 0, 1, 1, 1, 3, 3, 3, 3, 3])
         pool_e = itertools.cycle([np.nan, 0.0,
-                                  np.nan,1.0,1.0,
-                                  np.nan,3.0,3.0,3.0,3.0])
+                                  np.nan, 1.0, 1.0,
+                                  np.nan, 3.0, 3.0, 3.0, 3.0])
         for _ in range(N):
             d = (
                 next(pool),
@@ -347,7 +346,7 @@ class TestCtable():
                 for row in item:
                     f0 = row[0]
                     f1 += row[1]
-                ref.append([f0]+[f1])
+                ref.append([f0] + [f1])
 
             assert_list_equal(
                 sorted([list(x) for x in result_bcolz]),
@@ -463,9 +462,7 @@ class TestCtable():
                         new_values.append(item)
                         nan_found = True
 
-
         return new_values
-
 
     def gen_dataset_count_with_NA_08(self, N):
         pool = itertools.cycle(['a', 'a',
@@ -634,7 +631,6 @@ class TestCtable():
 
         assert_list_equal([list(x) for x in result_bcolz], [[4, 2]])
 
-
     def test_groupby_11(self):
         """
         test_groupby_11: Groupby's 'sorted_count_distinct', pre-filter  &
@@ -660,9 +656,8 @@ class TestCtable():
              (1, 4, 2)],
             dtype='i8,i8,i8')
 
-
         with self.on_disk_data_cleaner(data) as ct:
-            barr = ct.where_terms( [('f0', 'in', [0])] )
+            barr = ct.where_terms([('f0', 'in', [0])])
             result_bcolz = ct.groupby(groupby_cols, agg_list,
                                       bool_arr=barr)
 
@@ -690,7 +685,6 @@ class TestCtable():
              (0, 3),
              (1, 4)],
             dtype='i8,i8')
-
 
         with self.on_disk_data_cleaner(data) as ct:
             result_bcolz = ct.groupby(groupby_cols, agg_list)
@@ -722,7 +716,7 @@ class TestCtable():
 
         # -- Bcolz --
         with self.on_disk_data_cleaner(data) as ct:
-            barr = ct.where_terms( [('f0', 'in', [0, 1])] )
+            barr = ct.where_terms([('f0', 'in', [0, 1])])
             result_bcolz = ct.groupby(groupby_cols, agg_list,
                                       bool_arr=barr)
 
@@ -878,7 +872,6 @@ class TestCtable():
         # compare
         assert_array_equal(result, ref_result)
 
-
     def test_where_terms02(self):
         """
         test_where_terms02: get mask where terms not in list
@@ -900,7 +893,6 @@ class TestCtable():
         result = ct.where_terms(terms_filter)
 
         assert_array_equal(result, mask)
-
 
     def test_where_terms03(self):
         """

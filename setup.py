@@ -50,7 +50,7 @@ inc_dirs = [abspath('bquery')]
 lib_dirs = []
 libs = []
 def_macros = []
-sources = [abspath('bquery/ctable_ext.pyx')]
+sources = ['bquery/ctable_ext.pyx']
 
 optional_libs = []
 
@@ -80,7 +80,7 @@ if os.getenv('TRAVIS') and os.getenv('CI') and v[0:2] == (2, 7):
 
 setup(
     name="bquery",
-    version='0.1.0',
+    version='0.1.0.1',
     # version={
     #     'version_scheme': 'guess-next-dev',
     #     'local_scheme': 'dirty-tag',
