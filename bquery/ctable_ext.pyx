@@ -14,7 +14,6 @@ except ImportError:
 
 from libc.stdlib cimport malloc
 from libc.string cimport strcpy
-from libc.math cimport isnan
 from khash cimport *
 
 # ----------------------------------------------------------------------------
@@ -398,7 +397,7 @@ cdef count_unique(np.ndarray[numpy_native_number_input] values):
         for i in range(n):
             val = values[i]
 
-            if not isnan(val):
+            if not np.isnan(val):
                 k = kh_get_int64(int64_table, val)
                 if k == int64_table.n_buckets:
                     k = kh_put_int64(int64_table, val, &ret)
@@ -416,7 +415,7 @@ cdef count_unique(np.ndarray[numpy_native_number_input] values):
         for i in range(n):
             val = values[i]
 
-            if not isnan(val):
+            if not np.isnan(val):
                 k = kh_get_int32(int32_table, val)
                 if k == int32_table.n_buckets:
                     k = kh_put_int32(int32_table, val, &ret)
@@ -434,7 +433,7 @@ cdef count_unique(np.ndarray[numpy_native_number_input] values):
         for i in range(n):
             val = values[i]
 
-            if not isnan(val):
+            if not np.isnan(val):
                 k = kh_get_float64(float64_table, val)
                 if k == float64_table.n_buckets:
                     k = kh_put_float64(float64_table, val, &ret)
@@ -555,7 +554,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_NA:
 
                     v = in_buffer[i]
-                    if not isnan(v):  # skip NA values
+                    if not np.isnan(v):  # skip NA values
                         out_buffer[current_index] += 1
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
@@ -613,7 +612,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
                     v = in_buffer[i]
-                    if not isnan(v):  # skip NA values
+                    if not np.isnan(v):  # skip NA values
                         out_buffer[current_index] += 1
                 elif agg_method == _SORTED_COUNT_DISTINCT:
                     v = in_buffer[i]
