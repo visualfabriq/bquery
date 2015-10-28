@@ -19,6 +19,7 @@ parts/
 sdist/
 var/
 *.egg-info/
+.eggs/
 .installed.cfg
 *.egg
 
@@ -58,6 +59,7 @@ bquery/ctable_ext.c
 bquery/version.py
 bquery/benchmarks/vb_suite/benchmarks.db
 bquery/benchmarks/vb_suite/source
+bench-data.bcolz
 
 # Pycharm
 .idea
