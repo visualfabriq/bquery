@@ -1,2 +1,4 @@
-bquery/benchmarks
-bquery/tests
+# new try with more specified sub directories
+bquery/benchmarks/
+bquery/benchmarks/vb_suite
+bquery/tests/
