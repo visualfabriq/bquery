@@ -552,7 +552,6 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT:
                     out_buffer[current_index] += 1
                 elif agg_method == _COUNT_NA:
-
                     v = in_buffer[i]
                     if not np.isnan(v):  # skip NA values
                         out_buffer[current_index] += 1
