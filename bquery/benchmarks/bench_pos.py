@@ -1,10 +1,12 @@
-import bcolz as bz
 from contextlib import contextmanager
 import tempfile
 import os
 import random
 import shutil
 import time
+
+import bcolz as bz
+
 import bquery as bq
 
 

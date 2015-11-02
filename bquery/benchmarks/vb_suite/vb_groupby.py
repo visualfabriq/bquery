@@ -1,5 +1,6 @@
-from vbench.api import Benchmark
 from datetime import datetime
+
+from vbench.api import Benchmark
 
 common_setup = """
 import bquery

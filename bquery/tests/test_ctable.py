@@ -1,20 +1,20 @@
-import bquery
 import os
 import random
 import itertools
 import tempfile
 import shutil
+import math
+import itertools as itt
+from contextlib import contextmanager
+
 import nose
 import numpy as np
-import math
 import bcolz as bz
 from numpy.testing import assert_array_equal
 from numpy.testing import assert_allclose
 from nose.tools import assert_list_equal
-from nose.plugins.attrib import attr
-from nose.plugins.skip import SkipTest
-import itertools as itt
-from contextlib import contextmanager
+
+import bquery
 
 
 class TestCtable():

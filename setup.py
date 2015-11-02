@@ -77,7 +77,6 @@ if os.getenv('TRAVIS') and os.getenv('CI') and v[0:2] == (2, 7):
     CFLAGS.extend(["-fprofile-arcs", "-ftest-coverage"])
     LFLAGS.append("-lgcov")
 
-
 setup(
     name="bquery",
     version='0.1.0.2',

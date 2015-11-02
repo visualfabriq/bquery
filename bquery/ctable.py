@@ -4,7 +4,6 @@ from bquery import ctable_ext
 # external imports
 import numpy as np
 import bcolz
-import tempfile
 import os
 from bquery.ctable_ext import \
     SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT, \
@@ -112,8 +111,8 @@ class ctable(bcolz.ctable):
         return output
 
     def aggregate_groups(self, ct_agg, nr_groups, skip_key,
-                                   factor_carray, groupby_cols, output_agg_ops,
-                                   dtype_dict, bool_arr=None):
+                         factor_carray, groupby_cols, output_agg_ops,
+                         dtype_dict, bool_arr=None):
         '''Perform aggregation and place the result in the given ctable.
 
         Args:
@@ -133,7 +132,7 @@ class ctable(bcolz.ctable):
         for col in groupby_cols:
 
             result_array = ctable_ext.groupby_value(self[col], factor_carray,
-                                                  nr_groups, skip_key)
+                                                    nr_groups, skip_key)
 
             if bool_arr is not None:
                 result_array = np.delete(result_array, skip_key)
@@ -152,8 +151,8 @@ class ctable(bcolz.ctable):
 
             try:
                 ctable_ext.aggregate(input_col, factor_carray, nr_groups,
-                                           skip_key, input_buffer, output_buffer,
-                                           agg_op)
+                                     skip_key, input_buffer, output_buffer,
+                                     agg_op)
             except TypeError:
                 raise NotImplementedError(
                     'Column dtype ({0}) not supported for aggregation yet '
@@ -215,16 +214,16 @@ class ctable(bcolz.ctable):
         if bool_arr is None:
             expectedlen = nr_groups
         else:
-            expectedlen = nr_groups -1
+            expectedlen = nr_groups - 1
 
         ct_agg, dtype_dict, agg_ops = \
             self.create_agg_ctable(groupby_cols, agg_list, expectedlen, rootdir)
 
         # perform aggregation
         self.aggregate_groups(ct_agg, nr_groups, skip_key,
-                                        factor_carray, groupby_cols,
-                                        agg_ops, dtype_dict,
-                                        bool_arr=bool_arr)
+                              factor_carray, groupby_cols,
+                              agg_ops, dtype_dict,
+                              bool_arr=bool_arr)
 
         return ct_agg
 
@@ -433,8 +432,8 @@ class ctable(bcolz.ctable):
             'count_na': COUNT_NA,
             'count_distinct': COUNT_DISTINCT,
             'sorted_count_distinct': SORTED_COUNT_DISTINCT,
-            'mean' : MEAN,
-            'std' : STDEV
+            'mean': MEAN,
+            'std': STDEV
         }
 
         for agg_info in agg_list:
