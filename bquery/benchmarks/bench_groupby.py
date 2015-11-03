@@ -12,7 +12,6 @@ from cytoolz.curried import pluck
 import blaze as blz
 # other imports
 import contextlib
-import tempfile
 import os
 import time
 
@@ -24,6 +23,8 @@ except ImportError:
     izip = zip
 
 t_elapsed = 0.0
+
+
 @contextlib.contextmanager
 def ctime(message=None):
     "Counts the time spent in some context"
@@ -69,7 +70,7 @@ with ctime(message='cytoolz over bcolz'):
     # http://toolz.readthedocs.org/en/latest/streaming-analytics.html?highlight=reduce#split-apply-combine-with-groupby-and-reduceby
     r = cytoolz.groupby(lambda row: row.f0, ct)
     result = valmap(compose(sum, pluck(2)), r)
-print('x{0} slower than pandas'.format(round(t_elapsed/t_pandas, 2)))
+print('x{0} slower than pandas'.format(round(t_elapsed / t_pandas, 2)))
 print(result)
 
 # -- blaze + bcolz --
@@ -77,19 +78,19 @@ blaze_data = blz.Data(ct.rootdir)
 expr = blz.by(blaze_data.f0, sum_f2=blaze_data.f2.sum())
 with ctime(message='blaze over bcolz'):
     result = blz.compute(expr)
-print('x{0} slower than pandas'.format(round(t_elapsed/t_pandas, 2)))
+print('x{0} slower than pandas'.format(round(t_elapsed / t_pandas, 2)))
 print(result)
 
 # -- bquery --
 with ctime(message='bquery over bcolz'):
     result = ct.groupby(['f0'], ['f2'])
-print('x{0} slower than pandas'.format(round(t_elapsed/t_pandas, 2)))
+print('x{0} slower than pandas'.format(round(t_elapsed / t_pandas, 2)))
 print(result)
 
 ct.cache_factor(['f0'], refresh=True)
 with ctime(message='bquery over bcolz (factorization cached)'):
     result = ct.groupby(['f0'], ['f2'])
-print('x{0} slower than pandas'.format(round(t_elapsed/t_pandas, 2)))
+print('x{0} slower than pandas'.format(round(t_elapsed / t_pandas, 2)))
 print(result)
 
 shutil.rmtree(rootdir)

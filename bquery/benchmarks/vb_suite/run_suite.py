@@ -11,5 +11,6 @@ def run_process():
     runner.run()
     generate_rst_files(runner.benchmarks, DB_PATH, RST_BASE, """LONG DESC.""")
 
+
 if __name__ == '__main__':
     run_process()

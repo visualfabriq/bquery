@@ -1,10 +1,9 @@
-from vbench.api import Benchmark, GitRepo
 from datetime import datetime
-
 import os
 
+from vbench.api import Benchmark
 
-modules = ['vb_groupby',]
+modules = ['vb_groupby', ]
 
 by_module = {}
 benchmarks = []
@@ -16,10 +15,9 @@ for modname in modules:
     benchmarks.extend(by_module[modname])
 
 for bm in benchmarks:
-    assert(bm.name is not None)
+    assert (bm.name is not None)
 
 import getpass
-import sys
 
 USERNAME = getpass.getuser()
 HOME = os.path.expanduser('~')

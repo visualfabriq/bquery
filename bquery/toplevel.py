@@ -1,6 +1,8 @@
 import os
-import bquery
+
 from bcolz.ctable import ROOTDIRS
+
+import bquery
 
 
 def open(rootdir, mode='a'):
