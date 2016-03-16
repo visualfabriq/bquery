@@ -5,11 +5,8 @@ from bquery import ctable
 import bquery
 import bcolz
 
-# do not forget to install numexpr
-workdir = '/home/carst/Desktop/taxi/'
 
-
-def download_data():
+def download_data(workdir):
     # wget https://storage.googleapis.com/tlc-trip-data/2015/yellow_tripdata_2015-01.csv
     for year in [2015]:
         for month in range(1, 13):
@@ -19,7 +16,7 @@ def download_data():
             urllib.urlretrieve(url, workdir + '/' + filename)
 
 
-def create_bcolz():
+def create_bcolz(workdir):
 
     file_list = sorted(glob.glob(workdir + 'yellow_tripdata_*.csv'))
     if not file_list:
@@ -102,8 +99,7 @@ def create_bcolz():
         'vendorid'])
 
 
-
-def create_bcolz_chunks():
+def create_bcolz_chunks(workdir):
 
     file_list = sorted(glob.glob(workdir + 'yellow_tripdata_*.csv'))
     if not file_list:
@@ -181,57 +177,4 @@ def create_bcolz_chunks():
             'vendorid'])
 
 
-import_ct = ctable(rootdir=workdir + 'taxi', mode='a')
-measure_list = ['extra',
-                'fare_amount',
-                'improvement_surcharge',
-                'mta_tax',
-                'nr_rides',
-                'passenger_count',
-                'tip_amount',
-                'tolls_amount',
-                'total_amount',
-                'trip_distance']
 
-
-
-import_ct.groupby(['pickup_yearmonth'], ['nr_rides'])
-%timeit import_ct.groupby(['pickup_yearmonth'], ['nr_rides'])
-
-# In [22]: %timeit import_ct.groupby(['pickup_yearmonth'], ['nr_rides'])
-# 1 loop, best of 3: 6.91 s per loop
-
- %time nyc2015.payment_type.value_counts().compute()
-
-import_ct.groupby(['payment_type'], ['nr_rides'])
-%time import_ct.groupby(['payment_type'], ['nr_rides'])
-
-
-In [26]: %time import_ct.groupby(['payment_type'], ['nr_rides'])
-CPU times: user 11.3 s, sys: 284 ms, total: 11.5 s
-Wall time: 7.41 s
-
-compared to dask winine m3.2xlarge nodes on EC2. These have eight cores and 30GB of RAM each
->>> %time nyc2015.payment_type.value_counts().compute()
-CPU times: user 132 ms, sys: 0 ns, total: 132 ms
-Wall time: 558 ms
-
-13.8 times slower but without parallelization and only 84mb resident + 400mb virtual memory usage
-
-
-def example_query(rootdir):
-    import_ct = ctable(rootdir=rootdir, mode='a')
-    return import_ct.groupby(['payment_type'], ['nr_rides'])
-
-ct_list = glob.glob(workdir + 'taxi_*')
-
-from multiprocessing import Pool
-p = Pool(8)
-%time result = p.map(example_query, ct_list)
-p.close()
-
-In [26]: %time result = p.map(example_query, ct_list)
-CPU times: user 0 ns, sys: 4 ms, total: 4 ms
-Wall time: 2.58 s
-
-4.7 times slower with parallelization on 1 laptop with a quadcore; memory usage still less than 200mb
