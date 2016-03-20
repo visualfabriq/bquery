@@ -87,7 +87,7 @@ Testing
 -------
 ```nosetests bquery```
 
-Benchmarks
+Benchmark 1: Comparison to cytoolz and pandas
 ----------
 Short benchmark to compare bquery, cytoolz & pandas  
 ```python bquery/benchmarks/bench_groupby.py```
@@ -139,9 +139,13 @@ x1.57 slower than pandas
 ```
 For details about these results see please the python script
 
-You could also have a look at http://nbviewer.ipython.org/github/visualfabriq/bquery/blob/ipynb_bench/bquery/benchmarks/bench_groupby.ipynb
+You could also have a look at https://github.com/visualfabriq/bquery/blob/master/bquery/benchmarks/bench_groupby.ipynb
+
+Performance comparison to Dask using the NYC Taxi set
+--------------------
+See https://github.com/visualfabriq/bquery/blob/master/bquery/benchmarks/taxi/Taxi%20Set.ipynb
 
 Performance (vbench)
 --------------------
-Run vbench suite  
+Run vbench suite
 ```python bquery/benchmarks/vb_suite/run_suite.py```
