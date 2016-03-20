@@ -2,8 +2,6 @@ import urllib
 import glob
 import pandas as pd
 from bquery import ctable
-import bquery
-import bcolz
 
 
 def download_data(workdir):
@@ -17,7 +15,6 @@ def download_data(workdir):
 
 
 def create_bcolz(workdir):
-
     file_list = sorted(glob.glob(workdir + 'yellow_tripdata_*.csv'))
     if not file_list:
         raise ValueError('No Files Found')
@@ -68,9 +65,7 @@ def create_bcolz(workdir):
             temp_ct = ctable.fromdataframe(import_df)
             import_ct.append(temp_ct)
             del temp_ct
-            del import_import_ct = ctable.fromdataframe(import_df, rootdir=workdir + 'taxi', expectedlen=expected_len,
-                                                        mode='w')
-
+            del import_df
 
     import_ct.flush()
 
@@ -100,13 +95,11 @@ def create_bcolz(workdir):
 
 
 def create_bcolz_chunks(workdir):
-
     file_list = sorted(glob.glob(workdir + 'yellow_tripdata_*.csv'))
     if not file_list:
         raise ValueError('No Files Found')
 
     for i, filename in enumerate(file_list):
-
         print(filename)
 
         rootdir = workdir + 'taxi_' + str(i)
@@ -175,6 +168,3 @@ def create_bcolz_chunks(workdir):
             'ratecodeid',
             'store_and_fwd_flag',
             'vendorid'])
-
-
-
