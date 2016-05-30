@@ -55,7 +55,6 @@ cdef extern from "khash_python.h":
 
     bint kh_exist_str(kh_str_t*, khiter_t)
 
-
     ctypedef struct kh_int64_t:
         khint_t n_buckets, size, n_occupied, upper_bound
         uint32_t *flags
