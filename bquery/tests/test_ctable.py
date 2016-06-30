@@ -535,7 +535,7 @@ class TestCtable():
 
     def test_groupby_08b(self):
         """
-        test_groupby_08b: Groupby's type 'count_distinct'
+        test_groupby_08b: Groupby's type 'count_distinct' with a large number of records
         """
         random.seed(1)
 
