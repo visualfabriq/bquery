@@ -576,7 +576,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                     # combination
                     size_3 = size_1 + size_2 + 2
                     element_3 = <char *>malloc(size_3)
-                    strcpy(element_3, element_1 + b'|' + element_2)
+                    strcpy(element_3, element_1 + '|' + element_2)
                     # hash check
                     k = kh_get_str(table, element_3)
                     if k == table.n_buckets:
@@ -654,7 +654,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                     # combination
                     size_3 = size_1 + size_2 + 2
                     element_3 = <char *>malloc(size_3)
-                    strcpy(element_3, element_1 + b'|' + element_2)
+                    strcpy(element_3, element_1 + '|' + element_2)
                     # hash check
                     k = kh_get_str(table, element_3)
                     if k == table.n_buckets:
