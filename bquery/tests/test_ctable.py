@@ -533,6 +533,51 @@ class TestCtable():
         assert_list_equal(
             [list(x) for x in result_bcolz], ref)
 
+    def test_groupby_08b(self):
+        """
+        test_groupby_08b: Groupby's type 'count_distinct'
+        """
+        random.seed(1)
+
+        groupby_cols = ['f0']
+        groupby_lambda = lambda x: x[0]
+        agg_list = [['f4', 'count_distinct'], ['f5', 'count_distinct'], ['f6', 'count_distinct']]
+        num_rows = 200000
+
+        # -- Data --
+        g = self.gen_dataset_count_with_NA_08(num_rows)
+        data = np.fromiter(g, dtype='S1,f8,i8,i4,f8,i8,i4')
+        print('data')
+        print(data)
+
+        # -- Bcolz --
+        print('--> Bcolz')
+        self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
+        os.rmdir(self.rootdir)  # folder should be emtpy
+        fact_bcolz = bquery.ctable(data, rootdir=self.rootdir)
+        fact_bcolz.flush()
+
+        fact_bcolz.cache_factor(groupby_cols, refresh=True)
+        result_bcolz = fact_bcolz.groupby(groupby_cols, agg_list)
+        print(result_bcolz)
+        #
+        # # Itertools result
+        print('--> Itertools')
+        result_itt = self.helper_itt_groupby(data, groupby_lambda)
+        uniquekeys = result_itt['uniquekeys']
+        print(uniquekeys)
+
+        ref = []
+
+        for n, (u, item) in enumerate(zip(uniquekeys, result_itt['groups'])):
+            f4 = len(self._get_unique([x[4] for x in result_itt['groups'][n]]))
+            f5 = len(self._get_unique([x[5] for x in result_itt['groups'][n]]))
+            f6 = len(self._get_unique([x[6] for x in result_itt['groups'][n]]))
+            ref.append([u, f4, f5, f6])
+
+        assert_list_equal(
+            [list(x) for x in result_bcolz], ref)
+
     def gen_dataset_count_with_NA_09(self, N):
         pool = (random.choice(['a', 'b', 'c']) for _ in range(N))
         pool_b = (random.choice([0.1, 0.2, 0.3]) for _ in range(N))
