@@ -485,6 +485,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
 
     # for count distinct
     table = kh_init_str()
+    sep = '|'.encode()
 
     # standard
     count = 0
@@ -566,17 +567,19 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_DISTINCT:
                     v = in_buffer[i]
                     # index
-                    size_1 = len(bytes(current_index)) + 1
+                    tmp_str = str(current_index).encode()
+                    size_1 = len(tmp_str) + 1
                     element_1 = <char *>malloc(size_1)
-                    strcpy(element_1, bytes(current_index))
+                    strcpy(element_1, tmp_str)
                     # value
-                    size_2 = len(str(v)) + 1
+                    tmp_str = str(v).encode()
+                    size_2 = len(tmp_str) + 1
                     element_2 = <char *>malloc(size_2)
-                    strcpy(element_2, bytes(v))
+                    strcpy(element_2, tmp_str)
                     # combination
                     size_3 = size_1 + size_2 + 2
                     element_3 = <char *>malloc(size_3)
-                    strcpy(element_3, element_1 + '|' + element_2)
+                    strcpy(element_3, element_1 + sep + element_2)
                     # hash check
                     k = kh_get_str(table, element_3)
                     if k == table.n_buckets:
@@ -644,17 +647,19 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                 elif agg_method == _COUNT_DISTINCT:
                     v = in_buffer[i]
                     # index
-                    size_1 = len(bytes(current_index)) + 1
+                    tmp_str = str(current_index).encode()
+                    size_1 = len(tmp_str) + 1
                     element_1 = <char *>malloc(size_1)
-                    strcpy(element_1, bytes(current_index))
+                    strcpy(element_1, tmp_str)
                     # value
-                    size_2 = len(str(v)) + 1
+                    tmp_str = str(v).encode()
+                    size_2 = len(tmp_str) + 1
                     element_2 = <char *>malloc(size_2)
-                    strcpy(element_2, bytes(v))
+                    strcpy(element_2, tmp_str)
                     # combination
                     size_3 = size_1 + size_2 + 2
                     element_3 = <char *>malloc(size_3)
-                    strcpy(element_3, element_1 + '|' + element_2)
+                    strcpy(element_3, element_1 + sep + element_2)
                     # hash check
                     k = kh_get_str(table, element_3)
                     if k == table.n_buckets:
