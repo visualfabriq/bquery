@@ -477,22 +477,20 @@ cpdef aggregate(carray ca_input, carray ca_factor,
         bint count_distinct_started = 0
         carray num_uniques
 
+        kh_str_t *table
+        char *element_1
+        char *element_2
+        char *element_3
+        int ret, size_1, size_2, size_3
+
+    # for count distinct
+    table = kh_init_str()
+    sep = '|'.encode()
+
+    # standard
     count = 0
     ret = 0
     reverse = {}
-
-    if agg_method == _COUNT_DISTINCT:
-        positions, counts = groupsort_indexer(ca_factor, nr_groups)
-        start_counts = 0
-        end_counts = 0
-        for j in range(len(counts) - 1):
-            start_counts = end_counts
-            end_counts = start_counts + counts[j + 1]
-
-            out_buffer[j] = \
-                count_unique[numpy_native_number_input](ca_input[positions[start_counts:end_counts]])
-
-        return
 
     input_chunk_len = ca_input.chunklen
     factor_chunk_len = ca_factor.chunklen
@@ -565,8 +563,30 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                     else:
                         if v != last_values[current_index]:
                             out_buffer[current_index] += 1
-
                     last_values[current_index] = v
+                elif agg_method == _COUNT_DISTINCT:
+                    v = in_buffer[i]
+                    # index
+                    tmp_str = str(current_index).encode()
+                    size_1 = len(tmp_str) + 1
+                    element_1 = <char *>malloc(size_1)
+                    strcpy(element_1, tmp_str)
+                    # value
+                    tmp_str = str(v).encode()
+                    size_2 = len(tmp_str) + 1
+                    element_2 = <char *>malloc(size_2)
+                    strcpy(element_2, tmp_str)
+                    # combination
+                    size_3 = size_1 + size_2 + 2
+                    element_3 = <char *>malloc(size_3)
+                    strcpy(element_3, element_1 + sep + element_2)
+                    # hash check
+                    k = kh_get_str(table, element_3)
+                    if k == table.n_buckets:
+                        # first save the new element
+                        k = kh_put_str(table, element_3, &ret)
+                        # then up the amount of values found
+                        out_buffer[current_index] += 1
                 else:
                     raise NotImplementedError('sumtype not supported')
 
@@ -623,8 +643,30 @@ cpdef aggregate(carray ca_input, carray ca_factor,
                     else:
                         if v != last_values[current_index]:
                             out_buffer[current_index] += 1
-
                     last_values[current_index] = v
+                elif agg_method == _COUNT_DISTINCT:
+                    v = in_buffer[i]
+                    # index
+                    tmp_str = str(current_index).encode()
+                    size_1 = len(tmp_str) + 1
+                    element_1 = <char *>malloc(size_1)
+                    strcpy(element_1, tmp_str)
+                    # value
+                    tmp_str = str(v).encode()
+                    size_2 = len(tmp_str) + 1
+                    element_2 = <char *>malloc(size_2)
+                    strcpy(element_2, tmp_str)
+                    # combination
+                    size_3 = size_1 + size_2 + 2
+                    element_3 = <char *>malloc(size_3)
+                    strcpy(element_3, element_1 + sep + element_2)
+                    # hash check
+                    k = kh_get_str(table, element_3)
+                    if k == table.n_buckets:
+                        # first save the new element
+                        k = kh_put_str(table, element_3, &ret)
+                        # then up the amount of values found
+                        out_buffer[current_index] += 1
                 else:
                     raise NotImplementedError('sumtype not supported')
 
