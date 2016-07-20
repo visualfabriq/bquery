@@ -276,41 +276,19 @@ class ctable(bcolz.ctable):
                 int: (skip_key)
         '''
 
-        def _create_eval_str(groupby_cols, values_list, check_overflow=True):
-
-            eval_list = []
-            eval_str = ''
-            col_list = []
-            previous_value = 1
-            # Sort evaluated columns by length
-            col_len_list = [(col, values) for col, values in zip(groupby_cols, values_list)]
-            col_len_list.sort(key=lambda x: len(x[1]))
-            groupby_cols = [col for col, _ in col_len_list]
-            values_list = [values for _, values in col_len_list]
-
-            for col, values \
-                    in zip(groupby_cols, values_list):
-
-                # check for overflow
-                if check_overflow:
-                    if previous_value * len(values) > 4294967295:
-                        eval_list.append((eval_str, col_list))
-                        # reset
-                        eval_str = ''
-                        col_list = []
-                        previous_value = 1
-
-                if eval_str:
-                    eval_str += ' + '
-                else:
-                    eval_str += '-2147483648 + '
-
-                eval_str += str(previous_value) + '*' + col
-                col_list.append(col)
-                previous_value *= len(values)
-
-            eval_list.append((eval_str, col_list))
-            return eval_list
+        def _int_array_hash(input_list):
+            list_len = len(input_list)
+            arr_len = len(input_list[0])
+            mult_arr = np.full(arr_len, 1000003, dtype=np.long)
+            value_arr = np.full(arr_len, 0x345678, dtype=np.long)
+            for i, current_arr in enumerate(input_list):
+                index = list_len - i - 1
+                value_arr ^= current_arr
+                value_arr *= mult_arr
+                mult_arr += (82520 + index + index)
+                print(value_arr[0])
+            value_arr += 97531
+            return value_arr
 
         def _calc_group_index(eval_list, factor_set, vm=None):
             factorize_list = []
@@ -329,25 +307,10 @@ class ctable(bcolz.ctable):
             return False
 
         def calc_index(groupby_cols, values_list, factor_set, vm=None):
-            # Initialize eval list
-            eval_list = _create_eval_str(groupby_cols, values_list)
 
-            # Reduce expression as possible
-            while _is_reducible(eval_list):
-                del groupby_cols
-                del values_list
-                factorize_list = _calc_group_index(eval_list, factor_set)
-                factor_set = {'g' + str(i): x[0] for i, x in enumerate(factorize_list)}
-                groupby_cols = ['g' + str(i) for i, x in enumerate(factorize_list)]
-                values_list = [x[1] for i, x in enumerate(factorize_list)]
-                eval_list = _create_eval_str(groupby_cols, values_list)
-            # If we have multiple expressions that cannot be reduced anymore, rewrite as a single one and use Python vm
-            if len(eval_list) > 1:
-                eval_list = _create_eval_str(groupby_cols, values_list, check_overflow=False)
-                vm = 'python'
-
-            del groupby_cols
-            del values_list
+            blen = min(fact_bcolz[col].chunklen for col in fact_bcolz.cols)
+            for array_list in fact_bcolz[groupby_cols].iter(step=blen, out_flavor=tuple):
+                break
 
             # Now we have a single expression, factorize it
             return _calc_group_index(eval_list, factor_set, vm=vm)[0]
