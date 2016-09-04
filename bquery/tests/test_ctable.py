@@ -17,7 +17,7 @@ from nose.tools import assert_list_equal
 import bquery
 
 
-class TestCtable():
+class TestCtable(object):
     @contextmanager
     def on_disk_data_cleaner(self, data):
         self.rootdir = tempfile.mkdtemp(prefix='bcolz-')
