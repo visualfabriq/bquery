@@ -21,11 +21,12 @@ if any([v < (2, 6), (3,) < v < (3, 3)]):
 import os
 from os.path import abspath
 import sys
+import numpy as np
 
 from setuptools import setup, Extension, find_packages
 
 # Sources & libraries
-inc_dirs = [abspath('bquery')]
+inc_dirs = [abspath('bquery'), np.get_include()]
 lib_dirs = []
 libs = []
 def_macros = []
