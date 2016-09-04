@@ -57,9 +57,7 @@ ctypedef fused numpy_native_number_output:
     np.int32_t
     np.float64_t
 
-
 # ----------------------------------------------------------------------------
-
 # Factorize Section
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -765,7 +763,6 @@ cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_
 
     return out_buffer
 
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef is_in_ordered_subgroups(carray groups_col, carray bool_arr=None,
@@ -839,10 +836,9 @@ cpdef is_in_ordered_subgroups(carray groups_col, carray bool_arr=None,
 
     return ret
 
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef apply_where_terms_filter(list array_list, list op_list, list value_list, carray boolarr):
+cpdef apply_where_terms(list array_list, list op_list, list value_list, carray boolarr):
     """
     Update a boolean array with checks whether the values of a column (col) are in a set (value_set)
 
@@ -860,9 +856,10 @@ cpdef apply_where_terms_filter(list array_list, list op_list, list value_list, c
         Py_ssize_t total_len, out_index, in_index, chunk_len, out_check_pos, in_check_pos, leftover_elements
         np.ndarray[np.int8_t] out_buffer
         np.ndarray[np.int64_t] current_buffer
-        list walk_array_list, chunk_index_list, cursor_list, check_pos_list, current_chunk_list
+        list walk_array_list, cursor_list, check_pos_list, current_chunk_list
         set filter_set
-        int row_bool, filter_val, current_val, array_nr, op_id, current_chunk_nr
+        bint row_bool
+        int filter_val, current_val, array_nr, op_id, current_chunk_nr
 
     total_len = boolarr.len
 
@@ -871,7 +868,6 @@ cpdef apply_where_terms_filter(list array_list, list op_list, list value_list, c
 
     out_buffer = np.empty(chunk_len, dtype=np.int8)
     chunk_list = []
-    chunk_count_list = [current_carray.nr_chunks for current_carray in array_list]
 
     current_chunk_list = [1] * len(array_list)
     check_pos_list = []
@@ -882,7 +878,7 @@ cpdef apply_where_terms_filter(list array_list, list op_list, list value_list, c
         check_pos_list.append(chunk_len - 1)
         current_buffer = np.empty(chunk_len, dtype=np.int64)
 
-        if current_carray.nr_chunks > 0:
+        if current_carray.nchunks > 0:
             chunk_ = current_carray.chunks[0]
             # decompress into in_buffer
             chunk_._getitem(0, chunk_len, current_buffer.data)
@@ -964,7 +960,7 @@ cpdef apply_where_terms_filter(list array_list, list op_list, list value_list, c
                 current_chunk_list[array_nr] += 1
                 current_chunk_nr = current_chunk_list[array_nr]
 
-                if current_carray.nr_chunks >= current_chunk_nr:
+                if current_carray.nchunks >= current_chunk_nr:
                     chunk_ = current_carray.chunks[current_chunk_nr - 1]
                     # decompress into in_buffer
                     chunk_._getitem(0, chunk_len, current_buffer.data)
@@ -980,6 +976,7 @@ cpdef apply_where_terms_filter(list array_list, list op_list, list value_list, c
     if 0 < out_index < out_check_pos:
          boolarr.append(out_buffer[0:out_index])
 
+    return boolarr
 
 # ---------------------------------------------------------------------------
 # Temporary Section

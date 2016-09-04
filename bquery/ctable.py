@@ -447,7 +447,7 @@ class ctable(bcolz.ctable):
 
         array_list = []
         op_list = []
-        val_list = []
+        value_list = []
 
         for term in term_list:
             # get terms
@@ -499,10 +499,10 @@ class ctable(bcolz.ctable):
             # prepare input for filter creation
             array_list.append(self[filter_col])
             op_list.append(op_id)
-            val_list.append(filter_value)
+            value_list.append(filter_value)
 
         boolarr = bcolz.carray(np.ones(0, dtype=np.bool), expectedlen=self.len)
-        ctable_ext.apply_where_terms_filter(array_list, op_list, value_list, boolarr)
+        ctable_ext.apply_where_terms(array_list, op_list, value_list, boolarr)
 
         return boolarr
 
