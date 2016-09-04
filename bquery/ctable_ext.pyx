@@ -861,7 +861,7 @@ cpdef apply_where_terms(list array_list, list op_list, list value_list, carray b
         bint row_bool
         int filter_val, current_val, array_nr, op_id, current_chunk_nr
 
-    total_len = boolarr.len
+    total_len = array_list[0].len
 
     chunk_len = boolarr.chunklen
     out_check_pos = chunk_len - 1
@@ -976,7 +976,6 @@ cpdef apply_where_terms(list array_list, list op_list, list value_list, carray b
     if 0 < out_index < out_check_pos:
          boolarr.append(out_buffer[0:out_index])
 
-    return boolarr
 
 # ---------------------------------------------------------------------------
 # Temporary Section

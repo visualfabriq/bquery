@@ -478,7 +478,7 @@ class ctable(bcolz.ctable):
             else:
                 raise KeyError(unicode(filter_operator) + ' is not an accepted operator for filtering')
 
-            if filter_operator in [3, 4]:
+            if op_id in [3, 4]:
                 if type(filter_value) not in [list, set, tuple]:
                     raise ValueError("In selections need lists, sets or tuples")
 
@@ -502,6 +502,10 @@ class ctable(bcolz.ctable):
             value_list.append(filter_value)
 
         boolarr = bcolz.carray(np.ones(0, dtype=np.bool), expectedlen=self.len)
+
+        if not array_list:
+            return boolarr
+
         ctable_ext.apply_where_terms(array_list, op_list, value_list, boolarr)
 
         return boolarr
