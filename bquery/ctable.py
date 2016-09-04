@@ -277,43 +277,22 @@ class ctable(bcolz.ctable):
         '''
 
         def _int_array_hash(input_list):
+
             list_len = len(input_list)
             arr_len = len(input_list[0])
             mult_arr = np.full(arr_len, 1000003, dtype=np.long)
             value_arr = np.full(arr_len, 0x345678, dtype=np.long)
+
             for i, current_arr in enumerate(input_list):
                 index = list_len - i - 1
                 value_arr ^= current_arr
                 value_arr *= mult_arr
                 mult_arr += (82520 + index + index)
-                print(value_arr[0])
+
             value_arr += 97531
-            return value_arr
-
-        def _calc_group_index(eval_list, factor_set, vm=None):
-            factorize_list = []
-            for eval_node in eval_list:
-                # calculate the cartesian group index for each row
-                factor_input = bcolz.eval(eval_node[0], user_dict=factor_set, vm=vm)
-                # now factorize the unique groupby combinations
-                sub_factor_carray, sub_values = ctable_ext.factorize(factor_input)
-                factorize_list.append((sub_factor_carray, sub_values))
-            return factorize_list
-
-        def _is_reducible(eval_list):
-            for eval_node in eval_list:
-                if len(eval_node[1]) > 1:
-                    return True
-            return False
-
-        def calc_index(groupby_cols, values_list, factor_set, vm=None):
-
-            blen = min(fact_bcolz[col].chunklen for col in fact_bcolz.cols)
-            for array_list in fact_bcolz[groupby_cols].iter(step=blen, out_flavor=tuple):
-                break
-
-            # Now we have a single expression, factorize it
-            return _calc_group_index(eval_list, factor_set, vm=vm)[0]
+            result_carray = bcolz.carray(value_arr)
+            del value_arr
+            return result_carray
 
         # create unique groups for groupby loop
         if len(factor_list) == 0:
@@ -328,12 +307,11 @@ class ctable(bcolz.ctable):
             values = values_list[0]
         else:
             # multi column groupby
-            # nb: this might also be cached in the future
+            # todo: this might also be cached in the future
+            # todo: move out-of-core instead of a numpy array
             # first combine the factorized columns to single values
-            factor_set = {x: y for x, y in zip(groupby_cols, factor_list)}
-            # create a numexpr expression that calculates the place on
-            # a cartesian join index
-            factor_carray, values = calc_index(groupby_cols, values_list, factor_set)
+            group_array = _int_array_hash(factor_list)
+            factor_carray, values = ctable_ext.factorize(group_array)
 
         skip_key = None
 
