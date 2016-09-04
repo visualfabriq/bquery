@@ -967,7 +967,7 @@ cpdef apply_where_terms(list array_list, list op_list, list value_list, carray b
                 else:
                     current_buffer = current_carray.leftover_array
 
-                walk_array_list[current_carray] = current_buffer
+                walk_array_list[array_nr] = current_buffer
                 cursor_list[array_nr] = 0
             else:
                 cursor_list[array_nr] = in_index + 1
