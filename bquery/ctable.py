@@ -259,6 +259,25 @@ class ctable(bcolz.ctable):
 
         return factor_list, values_list
 
+    @staticmethod
+    def _int_array_hash(input_list):
+
+        list_len = len(input_list)
+        arr_len = len(input_list[0])
+        mult_arr = np.full(arr_len, 1000003, dtype=np.long)
+        value_arr = np.full(arr_len, 0x345678, dtype=np.long)
+
+        for i, current_arr in enumerate(input_list):
+            index = list_len - i - 1
+            value_arr ^= current_arr
+            value_arr *= mult_arr
+            mult_arr += (82520 + index + index)
+
+        value_arr += 97531
+        result_carray = bcolz.carray(value_arr)
+        del value_arr
+        return result_carray
+
     def make_group_index(self, factor_list, values_list, groupby_cols,
                          array_length, bool_arr):
         '''Create unique groups for groupby loop
@@ -276,24 +295,6 @@ class ctable(bcolz.ctable):
                 int: (skip_key)
         '''
 
-        def _int_array_hash(input_list):
-
-            list_len = len(input_list)
-            arr_len = len(input_list[0])
-            mult_arr = np.full(arr_len, 1000003, dtype=np.long)
-            value_arr = np.full(arr_len, 0x345678, dtype=np.long)
-
-            for i, current_arr in enumerate(input_list):
-                index = list_len - i - 1
-                value_arr ^= current_arr
-                value_arr *= mult_arr
-                mult_arr += (82520 + index + index)
-
-            value_arr += 97531
-            result_carray = bcolz.carray(value_arr)
-            del value_arr
-            return result_carray
-
         # create unique groups for groupby loop
         if len(factor_list) == 0:
             # no columns to groupby over, so directly aggregate the measure
@@ -310,7 +311,7 @@ class ctable(bcolz.ctable):
             # todo: this might also be cached in the future
             # todo: move out-of-core instead of a numpy array
             # first combine the factorized columns to single values
-            group_array = _int_array_hash(factor_list)
+            group_array = self._int_array_hash(factor_list)
             factor_carray, values = ctable_ext.factorize(group_array)
 
         skip_key = None
@@ -430,10 +431,7 @@ class ctable(bcolz.ctable):
 
     def where_terms(self, term_list):
         """
-        TEMPORARY WORKAROUND TILL NUMEXPR WORKS WITH IN
-        where_terms(term_list, outcols=None, limit=None, skip=0)
-
-        Iterate over rows where `term_list` is true.
+        Create a boolean array where `term_list` is true.
         A terms list has a [(col, operator, value), ..] construction.
         Eg. [('sales', '>', 2), ('state', 'in', ['IL', 'AR'])]
 
@@ -447,102 +445,68 @@ class ctable(bcolz.ctable):
         if type(term_list) not in [list, set, tuple]:
             raise ValueError("Only term lists are supported")
 
-        eval_string = ''
-        eval_list = []
+        array_list = []
+        op_list = []
+        value_list = []
 
         for term in term_list:
+            # get terms
             filter_col = term[0]
-            filter_operator = term[1].lower()
+            filter_operator = term[1].lower().strip(' ')
             filter_value = term[2]
 
-            if filter_operator not in ['in', 'not in']:
-                # direct filters should be added to the eval_string
+            # check values
+            if filter_col not in self.cols:
+                raise KeyError(unicode(filter_col) + ' not in table')
 
-                # add and logic if not the first term
-                if eval_string:
-                    eval_string += ' & '
+            if filter_operator in ['==', 'eq']:
+                op_id = 1
+            elif filter_operator in ['!=', 'neq']:
+                op_id = 2
+            elif filter_operator in ['in']:
+                op_id = 3
+            elif filter_operator in ['nin', 'not in']:
+                op_id = 4
+            elif filter_operator in ['>']:
+                op_id = 5
+            elif filter_operator in ['>=']:
+                op_id = 6
+            elif filter_operator in ['<']:
+                op_id = 7
+            elif filter_operator in ['<=']:
+                op_id = 8
+            else:
+                raise KeyError(unicode(filter_operator) + ' is not an accepted operator for filtering')
 
-                eval_string += '(' + filter_col + ' ' \
-                               + filter_operator + ' ' \
-                               + str(filter_value) + ')'
-
-            elif filter_operator in ['in', 'not in']:
-                # Check input
+            if op_id in [3, 4]:
                 if type(filter_value) not in [list, set, tuple]:
                     raise ValueError("In selections need lists, sets or tuples")
 
                 if len(filter_value) < 1:
                     raise ValueError("A value list needs to have values")
 
-                elif len(filter_value) == 1:
-                    # handle as eval
-                    # add and logic if not the first term
-                    if eval_string:
-                        eval_string += ' & '
-
-                    if filter_operator == 'not in':
-                        filter_operator = '!='
+                # optimize lists of 1 value
+                if len(filter_value) == 1:
+                    if op_id == 3:
+                        op_id = 1
                     else:
-                        filter_operator = '=='
-
-                    eval_string += '(' + filter_col + ' ' + \
-                                   filter_operator
+                        op_id = 2
 
                     filter_value = filter_value[0]
-
-                    if type(filter_value) == str:
-                        filter_value = '"' + filter_value + '"'
-                    else:
-                        filter_value = str(filter_value)
-
-                    eval_string += filter_value + ') '
-
                 else:
+                    filter_value = set(filter_value)
 
-                    if type(filter_value) in [list, tuple]:
-                        filter_value = set(filter_value)
+            # prepare input for filter creation
+            array_list.append(self[filter_col])
+            op_list.append(op_id)
+            value_list.append(filter_value)
 
-                    eval_list.append(
-                        (filter_col, filter_operator, filter_value)
-                    )
-            else:
-                raise ValueError(
-                    "Input not correctly formatted for eval or list filtering"
-                )
+        boolarr = bcolz.carray(np.ones(0, dtype=np.bool), expectedlen=self.len)
 
-        # (1) Evaluate terms in eval
-        # return eval_string, eval_list
-        if eval_string:
-            boolarr = self.eval(eval_string)
-            if eval_list:
-                # convert to numpy array for array_is_in
-                boolarr = boolarr[:]
-        else:
-            boolarr = np.ones(self.size, dtype=bool)
+        if not array_list:
+            return boolarr
 
-        # (2) Evaluate other terms like 'in' or 'not in' ...
-        for term in eval_list:
-
-            name = term[0]
-            col = self.cols[name]
-
-            operator = term[1]
-            if operator.lower() == 'not in':
-                reverse = True
-            elif operator.lower() == 'in':
-                reverse = False
-            else:
-                raise ValueError(
-                    "Input not correctly formatted for list filtering"
-                )
-
-            value_set = set(term[2])
-
-            ctable_ext.carray_is_in(col, value_set, boolarr, reverse)
-
-        if eval_list:
-            # convert boolarr back to carray
-            boolarr = bcolz.carray(boolarr)
+        ctable_ext.apply_where_terms(array_list, op_list, value_list, boolarr)
 
         return boolarr
 

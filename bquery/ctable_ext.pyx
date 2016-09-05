@@ -57,9 +57,7 @@ ctypedef fused numpy_native_number_output:
     np.int32_t
     np.float64_t
 
-
 # ----------------------------------------------------------------------------
-
 # Factorize Section
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -765,7 +763,6 @@ cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_
 
     return out_buffer
 
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef is_in_ordered_subgroups(carray groups_col, carray bool_arr=None,
@@ -839,39 +836,149 @@ cpdef is_in_ordered_subgroups(carray groups_col, carray bool_arr=None,
 
     return ret
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef apply_where_terms(list array_list, list op_list, list value_list, carray boolarr):
+    """
+    Update a boolean array with checks whether the values of a column (col) are in a set (value_set)
+
+    At the moment we assume integer input as it fits the current use cases
+
+    :param array_list:
+    :param op_list:
+    :param value_list:
+    :param boolarr:
+    :return:
+    """
+    cdef:
+        chunk chunk_
+        carray current_carray
+        Py_ssize_t total_len, out_index, in_index, chunk_len, out_check_pos, in_check_pos, leftover_elements
+        np.ndarray[np.int8_t] out_buffer
+        np.ndarray[np.int64_t] current_buffer
+        list walk_array_list, cursor_list, check_pos_list, current_chunk_list
+        set filter_set
+        bint row_bool
+        int filter_val, current_val, array_nr, op_id, current_chunk_nr
+
+    total_len = array_list[0].len
+
+    chunk_len = boolarr.chunklen
+    out_check_pos = chunk_len - 1
+
+    out_buffer = np.empty(chunk_len, dtype=np.int8)
+    chunk_list = []
+
+    current_chunk_list = [1] * len(array_list)
+    check_pos_list = []
+    walk_array_list = []
+
+    for array_nr, current_carray in enumerate(array_list):
+        chunk_len = current_carray.chunklen
+        check_pos_list.append(chunk_len - 1)
+        current_buffer = np.empty(chunk_len, dtype=np.int64)
+
+        if current_carray.nchunks > 0:
+            chunk_ = current_carray.chunks[0]
+            # decompress into in_buffer
+            chunk_._getitem(0, chunk_len, current_buffer.data)
+        else:
+            current_buffer = current_carray.leftover_array
+
+        walk_array_list.append(current_buffer)
+
+    out_index = 0
+    cursor_list = [0 for current_carray in array_list]
+
+    for _ in range(total_len):
+        row_bool = True
+
+        for array_nr, op_id in enumerate(op_list):
+
+            if op_id in [3, 4]:
+                filter_set = value_list[array_nr]
+            else:
+                filter_val = value_list[array_nr]
+
+            current_buffer = walk_array_list[array_nr]
+            in_index = cursor_list[array_nr]
+            current_val = current_buffer[in_index]
+
+            # instructions sorted on frequency
+            if op_id == 3:  # in
+                if current_val not in filter_set:
+                    row_bool = False
+                    break
+            elif op_id == 1:  # ==
+                if current_val != filter_val:
+                    row_bool = False
+                    break
+            elif op_id == 2:  # !=
+                if current_val == filter_val:
+                    row_bool = False
+                    break
+            elif op_id == 4:  # nin
+                if current_val in filter_set:
+                    row_bool = False
+                    break
+            elif op_id == 5:  # >
+                if current_val <= filter_val:
+                    row_bool = False
+                    break
+            elif op_id == 6:  # >=
+                if current_val < filter_val:
+                    row_bool = False
+                    break
+            elif op_id == 7:  # <
+                if current_val >= filter_val:
+                    row_bool = False
+                    break
+            elif op_id == 8:  # <=
+                if current_val > filter_val:
+                    row_bool = False
+                    break
+
+        # write bool result
+        out_buffer[out_index] = row_bool
+
+        # write array if we are at the end of the buffer
+        if out_index == out_check_pos:
+            boolarr.append(out_buffer)
+            out_index = 0
+        else:
+            out_index += 1
+
+        # update walk list
+        for array_nr, in_check_pos in enumerate(check_pos_list):
+            in_index = cursor_list[array_nr]
+
+            if in_index == in_check_pos:
+                # retrieve new values
+                current_carray = array_list[array_nr]
+                chunk_len = current_carray.chunklen
+                current_buffer = walk_array_list[array_nr]
+                current_chunk_list[array_nr] += 1
+                current_chunk_nr = current_chunk_list[array_nr]
+
+                if current_carray.nchunks >= current_chunk_nr:
+                    chunk_ = current_carray.chunks[current_chunk_nr - 1]
+                    # decompress into in_buffer
+                    chunk_._getitem(0, chunk_len, current_buffer.data)
+                else:
+                    current_buffer = current_carray.leftover_array
+
+                walk_array_list[array_nr] = current_buffer
+                cursor_list[array_nr] = 0
+            else:
+                cursor_list[array_nr] = in_index + 1
+
+    # write dangling last array if available
+    if 0 < out_index < out_check_pos:
+         boolarr.append(out_buffer[0:out_index])
+
 
 # ---------------------------------------------------------------------------
 # Temporary Section
-@cython.boundscheck(False)
-@cython.wraparound(False)
-cpdef carray_is_in(carray col, set value_set, np.ndarray boolarr, bint reverse):
-    """
-    TEMPORARY WORKAROUND till numexpr support in list operations
-
-    Update a boolean array with checks whether the values of a column (col) are in a set (value_set)
-    Reverse means "not in" functionality
-
-    For the 0d array work around, see https://github.com/Blosc/bcolz/issues/61
-
-    :param col:
-    :param value_set:
-    :param boolarr:
-    :param reverse:
-    :return:
-    """
-    cdef Py_ssize_t i
-    i = 0
-    if not reverse:
-        for val in col.iter():
-            if val not in value_set:
-                boolarr[i] = False
-            i += 1
-    else:
-        for val in col.iter():
-            if val in value_set:
-                boolarr[i] = False
-            i += 1
-
 # Translate existing arrays
 @cython.wraparound(False)
 @cython.boundscheck(False)
