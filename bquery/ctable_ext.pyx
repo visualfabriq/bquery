@@ -976,6 +976,68 @@ cpdef apply_where_terms(list array_list, list op_list, list value_list, carray b
     if 0 < out_index < out_check_pos:
          boolarr.append(out_buffer[0:out_index])
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef calc_int_array_hash(tuple input_tuple, int index):
+    cdef np.int64_t output_hash = 0x345678
+    cdef np.int64_t multiplier = 1000003
+    cdef np.int64_t current_val
+
+    for current_val in input_tuple:
+        index -= 1
+        output_hash ^= current_val
+        output_hash *= multiplier
+        multiplier += (82520 + 2 * index)
+
+    output_hash += 97531
+
+    return output_hash
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef create_group_index(ctable_iter, int nr_arrays, carray group_arr):
+    """
+    Creates a boolean array with a unique number for the combination of a number of indexes
+
+    At the moment we assume integer input as it fits the current use cases
+
+    :param ctable_iter:
+    :param group_arr:
+    :return:
+    """
+    cdef:
+        chunk chunk_
+        carray current_carray
+        Py_ssize_t total_len, out_index, in_index, chunk_len, out_check_pos, in_check_pos, leftover_elements
+        np.ndarray[np.int64_t] out_buffer
+        np.ndarray[np.int64_t] current_buffer
+        list walk_array_list, cursor_list, check_pos_list, current_chunk_list, row_value_list
+        set filter_set
+        bint row_bool
+        int filter_val, array_nr, op_id, current_chunk_nr, i
+        np.int64_t current_val, row_hash
+        tuple col_tuple
+
+    chunk_len = group_arr.chunklen
+    out_check_pos = chunk_len - 1
+
+    out_buffer = np.empty(chunk_len, dtype=np.int64)
+    out_index = 0
+
+    for col_tuple in ctable_iter:
+        # calculate row index and save
+        out_buffer[out_index] = calc_int_array_hash(col_tuple, nr_arrays)
+
+        # write array if we are at the end of the buffer
+        if out_index == out_check_pos:
+            group_arr.append(out_buffer)
+            out_index = 0
+        else:
+            out_index += 1
+
+    # write dangling last array if available
+    if 0 < out_index < out_check_pos:
+         group_arr.append(out_buffer[0:out_index])
 
 # ---------------------------------------------------------------------------
 # Temporary Section
