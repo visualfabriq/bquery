@@ -54,7 +54,8 @@ class ctable(bcolz.ctable):
         cache_valid = False
 
         if self.rootdir:
-            col_values_file_check = self.create_group_base_name(col_list) + '.values/__attrs__'
+            col_values_file_check = os.path.join(self.rootdir, self.create_group_base_name(col_list)) + \
+                                    '.values/__attrs__'
 
             exists_group_index = os.path.exists(col_values_file_check)
             missing_col_check = [1 for col in col_list if not os.path.exists(self[col].rootdir + '/__attrs__')]
@@ -88,6 +89,11 @@ class ctable(bcolz.ctable):
 
         if not isinstance(col_list, list):
             col_list = [col_list]
+
+        if refresh:
+            kill_list = [x for x in os.listdir(self.rootdir) if '.factor' in x or '.values' in x]
+            for kill_dir in kill_list:
+                shutil.rmtree(os.path.join(self.rootdir, kill_dir))
 
         for col in col_list:
 
@@ -323,7 +329,7 @@ class ctable(bcolz.ctable):
 
     def create_group_column_factor(self, factor_list, groupby_cols, cache=False):
         if cache:
-            col_rootdir = self.create_group_base_name(groupby_cols)
+            col_rootdir = os.path.join(self.rootdir, self.create_group_base_name(groupby_cols))
             col_factor_rootdir = col_rootdir + '.factor'
             col_values_rootdir = col_rootdir + '.values'
             input_rootdir = tempfile.mkdtemp(prefix='bcolz-')
@@ -397,7 +403,7 @@ class ctable(bcolz.ctable):
             # first combine the factorized columns to single values
             if self.group_cache_valid(col_list=groupby_cols):
                 # there is a group cache that we can use
-                col_rootdir = self.create_group_base_name(groupby_cols)
+                col_rootdir = os.path.join(self.rootdir, self.create_group_base_name(groupby_cols))
                 col_factor_rootdir = col_rootdir + '.factor'
                 carray_factor = bcolz.carray(rootdir=col_factor_rootdir)
                 col_values_rootdir = col_rootdir + '.values'
