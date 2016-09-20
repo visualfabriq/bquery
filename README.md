@@ -3,7 +3,7 @@ bquery
 
 ![bquery logo](bquery.png)
 
-A query and aggregation framework for Bcolz.
+Bquery is a query and aggregation framework for bcolz, enabling very fast yet out-of-core big data aggregations on any hardware (from laptops to clusters). Bquery is used in production environments to handle reporting and data retrieval queries over hundreds of files that each can contain billions of records.
 
 Bcolz is a light weight package that provides columnar, chunked data containers that can be compressed either in-memory and on-disk. that are compressed by default not only for reducing memory/disk storage, but also to improve I/O speed. It excels at storing and sequentially accessing large, numerical data sets.
 
