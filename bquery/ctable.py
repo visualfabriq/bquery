@@ -108,13 +108,12 @@ class ctable(bcolz.ctable):
                 # create factor
                 carray_factor = \
                     bcolz.carray([], dtype='int64', expectedlen=self.size,
-                                 rootdir=col_factor_rootdir, mode='w')
+                                 rootdir=col_factor_rootdir_tmp, mode='w')
                 _, values = \
                     ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
                 shutil.rmtree(col_factor_rootdir, ignore_errors=True)
                 shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
-                carray_factor.rootdir = col_factor_rootdir
 
                 # create values
                 carray_values = \
@@ -123,7 +122,6 @@ class ctable(bcolz.ctable):
                 carray_values.flush()
                 shutil.rmtree(col_values_rootdir, ignore_errors=True)
                 shutil.move(col_values_rootdir_tmp, col_values_rootdir)
-                carray_values.rootdir = col_values_rootdir
 
     def unique(self, col_or_col_list):
         """
@@ -363,7 +361,7 @@ class ctable(bcolz.ctable):
             carray_factor.flush()
             shutil.rmtree(col_factor_rootdir, ignore_errors=True)
             shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
-            carray_factor.rootdir = col_factor_rootdir
+            carray_factor = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
 
         carray_values = \
             bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir_tmp)
@@ -371,7 +369,7 @@ class ctable(bcolz.ctable):
             carray_values.flush()
             shutil.rmtree(col_values_rootdir, ignore_errors=True)
             shutil.move(col_values_rootdir_tmp, col_values_rootdir)
-            carray_values.rootdir = col_values_rootdir
+            carray_values = bcolz.carray(rootdir=col_values_rootdir, mode='r')
 
         del group_array
         if cache:
