@@ -7,7 +7,6 @@ import shutil
 # external imports
 import numpy as np
 import bcolz
-import os
 from bquery.ctable_ext import \
     SUM, COUNT, COUNT_NA, COUNT_DISTINCT, SORTED_COUNT_DISTINCT, \
     MEAN, STDEV
@@ -317,6 +316,17 @@ class ctable(bcolz.ctable):
 
     @staticmethod
     def _int_array_hash(input_list):
+        """
+        A function to calculate a hash value of multiple integer values, not used at the moment
+
+        Parameters
+        ----------
+        input_list
+
+        Returns
+        -------
+
+        """
 
         list_len = len(input_list)
         arr_len = len(input_list[0])
@@ -335,6 +345,19 @@ class ctable(bcolz.ctable):
         return result_carray
 
     def create_group_column_factor(self, factor_list, groupby_cols, cache=False):
+        """
+        Create a unique, factorized column out of a lost of individual columns
+
+        Parameters
+        ----------
+        factor_list
+        groupby_cols
+        cache
+
+        Returns
+        -------
+
+        """
         if cache:
             col_rootdir = os.path.join(self.rootdir, self.create_group_base_name(groupby_cols))
             col_factor_rootdir = col_rootdir + '.factor'
