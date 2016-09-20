@@ -12,6 +12,7 @@ Changes from 0.1 to 0.2
 - Removed groupby maximum number of columns bottleneck (by using the cpython tuple hash calculation
 - Improved count distinct performance
 - Solved issues with pip v8 and numpy version dependencies
+- Added "auto_cache" attribute that will cache factorizations (numerical representations of the input) automatically
 
 
 Release  0.1
