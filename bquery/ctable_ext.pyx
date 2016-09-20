@@ -838,7 +838,7 @@ cpdef is_in_ordered_subgroups(carray groups_col, carray bool_arr=None,
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef apply_where_terms(list array_list, list op_list, list value_list, carray boolarr):
+cpdef apply_where_terms(ctable_iter, list op_list, list value_list, carray boolarr):
     """
     Update a boolean array with checks whether the values of a column (col) are in a set (value_set)
 
@@ -851,58 +851,27 @@ cpdef apply_where_terms(list array_list, list op_list, list value_list, carray b
     :return:
     """
     cdef:
-        chunk chunk_
-        carray current_carray
         Py_ssize_t total_len, out_index, in_index, chunk_len, out_check_pos, in_check_pos, leftover_elements
         np.ndarray[np.int8_t] out_buffer
-        np.ndarray[np.int64_t] current_buffer
-        list walk_array_list, cursor_list, check_pos_list, current_chunk_list
         set filter_set
         bint row_bool
         int filter_val, current_val, array_nr, op_id, current_chunk_nr
-
-    total_len = array_list[0].len
+        tuple row
 
     chunk_len = boolarr.chunklen
     out_check_pos = chunk_len - 1
-
     out_buffer = np.empty(chunk_len, dtype=np.int8)
-    chunk_list = []
-
-    current_chunk_list = [1] * len(array_list)
-    check_pos_list = []
-    walk_array_list = []
-
-    for array_nr, current_carray in enumerate(array_list):
-        chunk_len = current_carray.chunklen
-        check_pos_list.append(chunk_len - 1)
-        current_buffer = np.empty(chunk_len, dtype=np.int64)
-
-        if current_carray.nchunks > 0:
-            chunk_ = current_carray.chunks[0]
-            # decompress into in_buffer
-            chunk_._getitem(0, chunk_len, current_buffer.data)
-        else:
-            current_buffer = current_carray.leftover_array
-
-        walk_array_list.append(current_buffer)
-
     out_index = 0
-    cursor_list = [0 for current_carray in array_list]
 
-    for _ in range(total_len):
+    for row in ctable_iter:
         row_bool = True
 
-        for array_nr, op_id in enumerate(op_list):
+        for current_val, op_id, input_val in zip(row, op_list, value_list):
 
             if op_id in [3, 4]:
-                filter_set = value_list[array_nr]
+                filter_set = input_val
             else:
-                filter_val = value_list[array_nr]
-
-            current_buffer = walk_array_list[array_nr]
-            in_index = cursor_list[array_nr]
-            current_val = current_buffer[in_index]
+                filter_val = input_val
 
             # instructions sorted on frequency
             if op_id == 3:  # in
@@ -947,30 +916,6 @@ cpdef apply_where_terms(list array_list, list op_list, list value_list, carray b
             out_index = 0
         else:
             out_index += 1
-
-        # update walk list
-        for array_nr, in_check_pos in enumerate(check_pos_list):
-            in_index = cursor_list[array_nr]
-
-            if in_index == in_check_pos:
-                # retrieve new values
-                current_carray = array_list[array_nr]
-                chunk_len = current_carray.chunklen
-                current_buffer = walk_array_list[array_nr]
-                current_chunk_list[array_nr] += 1
-                current_chunk_nr = current_chunk_list[array_nr]
-
-                if current_carray.nchunks >= current_chunk_nr:
-                    chunk_ = current_carray.chunks[current_chunk_nr - 1]
-                    # decompress into in_buffer
-                    chunk_._getitem(0, chunk_len, current_buffer.data)
-                else:
-                    current_buffer = current_carray.leftover_array
-
-                walk_array_list[array_nr] = current_buffer
-                cursor_list[array_nr] = 0
-            else:
-                cursor_list[array_nr] = in_index + 1
 
     # write dangling last array if available
     if 0 < out_index < out_check_pos:

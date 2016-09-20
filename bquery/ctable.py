@@ -67,7 +67,6 @@ class ctable(bcolz.ctable):
 
         return cache_valid
 
-
     def cache_factor(self, col_list, refresh=False):
         """
         Existing todos here are: these should be hidden helper carrays
@@ -114,7 +113,6 @@ class ctable(bcolz.ctable):
                     bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype),
                                  rootdir=col_values_rootdir, mode='w')
                 carray_values.flush()
-
 
     def unique(self, col_or_col_list):
         """
@@ -348,7 +346,7 @@ class ctable(bcolz.ctable):
         factor_table = bcolz.ctable(factor_list, names=groupby_cols)
         ctable_iter = factor_table.iter(outcols=groupby_cols, out_flavor=tuple)
         ctable_ext.create_group_index(ctable_iter, len(groupby_cols), group_array)
-        
+
         # now factorize the results
         carray_factor = \
             bcolz.carray([], dtype='int64', expectedlen=self.size,
@@ -361,7 +359,7 @@ class ctable(bcolz.ctable):
             bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir)
         if cache:
             carray_values.flush()
-        
+
         if cache:
             # clean up the temporary file
             shutil.rmtree(input_rootdir)
@@ -399,7 +397,6 @@ class ctable(bcolz.ctable):
             carray_values = values_list[0]
         else:
             # multi column groupby
-            # todo: this might also be cached in the future
             # first combine the factorized columns to single values
             if self.group_cache_valid(col_list=groupby_cols):
                 # there is a group cache that we can use
@@ -510,7 +507,6 @@ class ctable(bcolz.ctable):
                         'Unknown Aggregation Type: ' + unicode(agg_op_input))
                 agg_op = op_translation[agg_op_input]
 
-
             # choose output column dtype based on aggregation operation and
             # input column dtype
             # TODO: check if the aggregation columns is numeric
@@ -552,7 +548,7 @@ class ctable(bcolz.ctable):
         if type(term_list) not in [list, set, tuple]:
             raise ValueError("Only term lists are supported")
 
-        array_list = []
+        col_list = []
         op_list = []
         value_list = []
 
@@ -604,16 +600,14 @@ class ctable(bcolz.ctable):
                     filter_value = set(filter_value)
 
             # prepare input for filter creation
-            array_list.append(self[filter_col])
+            col_list.append(filter_col)
             op_list.append(op_id)
             value_list.append(filter_value)
 
+        # create boolean array and fill it
         boolarr = bcolz.carray(np.ones(0, dtype=np.bool), expectedlen=self.len)
-
-        if not array_list:
-            return boolarr
-
-        ctable_ext.apply_where_terms(array_list, op_list, value_list, boolarr)
+        ctable_iter = self[col_list].iter(out_flavor='tuple')
+        ctable_ext.apply_where_terms(ctable_iter, op_list, value_list, boolarr)
 
         return boolarr
 
