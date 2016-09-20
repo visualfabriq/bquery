@@ -98,21 +98,32 @@ class ctable(bcolz.ctable):
 
             # create cache if needed
             if refresh or not self.cache_valid(col):
+                # create directories
                 col_rootdir = self[col].rootdir
                 col_factor_rootdir = col_rootdir + '.factor'
+                col_factor_rootdir_tmp = tempfile.mkdtemp(prefix='bcolz-')
                 col_values_rootdir = col_rootdir + '.values'
+                col_values_rootdir_tmp = tempfile.mkdtemp(prefix='bcolz-')
 
+                # create factor
                 carray_factor = \
                     bcolz.carray([], dtype='int64', expectedlen=self.size,
                                  rootdir=col_factor_rootdir, mode='w')
                 _, values = \
                     ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
+                shutil.rmtree(col_factor_rootdir, ignore_errors=True)
+                shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
+                carray_factor.rootdir = col_factor_rootdir
 
+                # create values
                 carray_values = \
                     bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype),
-                                 rootdir=col_values_rootdir, mode='w')
+                                 rootdir=col_values_rootdir_tmp, mode='w')
                 carray_values.flush()
+                shutil.rmtree(col_values_rootdir, ignore_errors=True)
+                shutil.move(col_values_rootdir_tmp, col_values_rootdir)
+                carray_values.rootdir = col_values_rootdir
 
     def unique(self, col_or_col_list):
         """
@@ -329,18 +340,14 @@ class ctable(bcolz.ctable):
         if cache:
             col_rootdir = os.path.join(self.rootdir, self.create_group_base_name(groupby_cols))
             col_factor_rootdir = col_rootdir + '.factor'
+            col_factor_rootdir_tmp = tempfile.mkdtemp(prefix='bcolz-')
             col_values_rootdir = col_rootdir + '.values'
+            col_values_rootdir_tmp = tempfile.mkdtemp(prefix='bcolz-')
             input_rootdir = tempfile.mkdtemp(prefix='bcolz-')
-            # clean directories
-            if os.path.exists(col_factor_rootdir):
-                shutil.rmtree(col_factor_rootdir)
-            if os.path.exists(col_values_rootdir):
-                shutil.rmtree(col_values_rootdir)
-            if os.path.exists(input_rootdir):
-                shutil.rmtree(input_rootdir)
         else:
-            col_factor_rootdir = None
-            col_values_rootdir = None
+            input_rootdir = None
+            col_factor_rootdir_tmp = None
+            col_values_rootdir_tmp = None
 
         group_array = bcolz.zeros(0, dtype=np.int64, expectedlen=len(self), rootdir=input_rootdir)
         factor_table = bcolz.ctable(factor_list, names=groupby_cols)
@@ -350,19 +357,26 @@ class ctable(bcolz.ctable):
         # now factorize the results
         carray_factor = \
             bcolz.carray([], dtype='int64', expectedlen=self.size,
-                         rootdir=col_factor_rootdir)
+                         rootdir=col_factor_rootdir_tmp)
         carray_factor, values = ctable_ext.factorize(group_array, labels=carray_factor)
         if cache:
             carray_factor.flush()
+            shutil.rmtree(col_factor_rootdir, ignore_errors=True)
+            shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
+            carray_factor.rootdir = col_factor_rootdir
 
         carray_values = \
-            bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir)
+            bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir_tmp)
         if cache:
             carray_values.flush()
+            shutil.rmtree(col_values_rootdir, ignore_errors=True)
+            shutil.move(col_values_rootdir_tmp, col_values_rootdir)
+            carray_values.rootdir = col_values_rootdir
 
+        del group_array
         if cache:
             # clean up the temporary file
-            shutil.rmtree(input_rootdir)
+            shutil.rmtree(input_rootdir, ignore_errors=True)
 
         return carray_factor, carray_values
 
