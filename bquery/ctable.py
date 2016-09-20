@@ -347,15 +347,14 @@ class ctable(bcolz.ctable):
             col_factor_rootdir_tmp = None
             col_values_rootdir_tmp = None
 
-        group_array = bcolz.zeros(0, dtype=np.int64, expectedlen=len(self), rootdir=input_rootdir)
+        group_array = bcolz.zeros(0, dtype=np.int64, expectedlen=len(self), rootdir=input_rootdir, mode='w')
         factor_table = bcolz.ctable(factor_list, names=groupby_cols)
         ctable_iter = factor_table.iter(outcols=groupby_cols, out_flavor=tuple)
         ctable_ext.create_group_index(ctable_iter, len(groupby_cols), group_array)
 
         # now factorize the results
         carray_factor = \
-            bcolz.carray([], dtype='int64', expectedlen=self.size,
-                         rootdir=col_factor_rootdir_tmp)
+            bcolz.carray([], dtype='int64', expectedlen=self.size, rootdir=col_factor_rootdir_tmp, mode='w')
         carray_factor, values = ctable_ext.factorize(group_array, labels=carray_factor)
         if cache:
             carray_factor.flush()
@@ -364,7 +363,7 @@ class ctable(bcolz.ctable):
             carray_factor = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
 
         carray_values = \
-            bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir_tmp)
+            bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir_tmp, mode='w')
         if cache:
             carray_values.flush()
             shutil.rmtree(col_values_rootdir, ignore_errors=True)
