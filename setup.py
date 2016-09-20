@@ -15,7 +15,7 @@ from sys import version_info as v
 
 # Check this Python version is supported
 if any([v < (2, 6), (3,) < v < (3, 3)]):
-    raise Exception("Unsupported Python version %d.%d. Requires Python >= 2.6 "
+    raise Exception("Unsupported Python version %d.%d. Requires Python >= 2.7 "
                     "or >= 3.3." % v[:2])
 
 import os
@@ -40,7 +40,7 @@ if v < (3,):
 
 setup(
     name="bquery",
-    version='0.1.0.2',
+    version='0.2.0.0',
     # version={
     #     'version_scheme': 'guess-next-dev',
     #     'local_scheme': 'dirty-tag',
