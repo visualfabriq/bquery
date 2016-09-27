@@ -67,7 +67,7 @@ install_requires = [
     'pip>=8.1.2',
     'setuptools>=27.3',
     'numpy>=1.7',
-    'bcolz>=1.1.3'
+    'bcolz>=1.1.0'
 ]
 setup_requires = [
     'cython>=0.22',
