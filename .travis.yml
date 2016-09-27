@@ -47,18 +47,3 @@ script:
 notifications:
 email: false
 
-
-
-
-os:
-- linux
-- osx
-python:
-- 2.7
-- 3.3
-- 3.4
-- 3.5
-install:
-
-- python setup.py build_ext --inplace
-
