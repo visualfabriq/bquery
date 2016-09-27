@@ -66,11 +66,12 @@ optional_libs = ['numexpr>=1.4.1']
 install_requires = [
     'pip>=8.1.2',
     'setuptools>=27.3',
+    'cython>=0.22',
     'numpy>=1.7',
     'bcolz>=1.1.0'
 ]
 setup_requires = [
-    'cython>=0.22',
+    'numpy>=1.7',
 ]
 tests_requires = []
 if v < (3,):
