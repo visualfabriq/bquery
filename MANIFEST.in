@@ -1,7 +1,4 @@
-include MANIFEST.in
-include *.txt *.rst *.md
-include setup.py
-
+include *.txt *.rst *.md *.png setup.py MANIFEST.in LICENSE .travis.yml
 recursive-include bquery *.py *.pyx *.pxd *.c *.h
 recursive-include bquery/tests *.py
 recursive-include bquery/benchmarks *.py *.md *.ipynb
