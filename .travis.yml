@@ -28,6 +28,7 @@ install: |
       source venv/bin/activate;
       pip install pip --upgrade
       pip install setuptools --upgrade
+      pip install nose --upgrade
       pip install --install-option='--no-cython-compile' cython
       pip install numpy
       pip install bcolz
@@ -36,6 +37,7 @@ install: |
   else
       pip install pip --upgrade
       pip install setuptools --upgrade
+      pip install nose --upgrade
       pip install --install-option='--no-cython-compile' cython
       pip install numpy
       pip install bcolz
