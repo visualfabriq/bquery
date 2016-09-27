@@ -3,7 +3,13 @@ Release notes for bquery
 ========================
 
 
-Changes from 0.1 to 0.2
+Changes from 0.2.0 to 0.2.1
+=======================
+
+- Improved dependency handling during setup
+
+
+Changes from 0.1.0 to 0.2.0
 =======================
 
 - Greatly reduced memory usage
@@ -15,7 +21,7 @@ Changes from 0.1 to 0.2
 - Added "auto_cache" attribute that will cache factorizations (numerical representations of the input) automatically
 
 
-Release  0.1
+Release  0.1.0
 =======================
 - Inital release
 

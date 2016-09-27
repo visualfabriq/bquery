@@ -7,53 +7,90 @@
 #       Author:  Carst Vaartjes - cvaartjes@visualfabriq.com
 #
 ########################################################################
-
-
 from __future__ import absolute_import
 
+import codecs
+import os
+
+from setuptools import setup, Extension, find_packages
+from os.path import abspath
 from sys import version_info as v
+from setuptools.command.build_ext import build_ext as _build_ext
+
 
 # Check this Python version is supported
 if any([v < (2, 6), (3,) < v < (3, 3)]):
     raise Exception("Unsupported Python version %d.%d. Requires Python >= 2.7 "
                     "or >= 3.3." % v[:2])
 
-import os
-from os.path import abspath
-import sys
-import numpy as np
 
-from setuptools import setup, Extension, find_packages
+class build_ext(_build_ext):
+    def finalize_options(self):
+        _build_ext.finalize_options(self)
+        # Prevent numpy from thinking it is still in its setup process:
+        __builtins__.__NUMPY_SETUP__ = False
+        import numpy
+        self.include_dirs.append(numpy.get_include())
+
+
+HERE = os.path.abspath(os.path.dirname(__file__))
+
+def read(*parts):
+    """
+    Build an absolute path from *parts* and and return the contents of the
+    resulting file.  Assume UTF-8 encoding.
+    """
+    with codecs.open(os.path.join(HERE, *parts), "rb", "utf-8") as f:
+        return f.read()
+
+
+def get_version():
+    with codecs.open(abspath('VERSION'), "r", "utf-8") as f:
+        return f.readline().rstrip('\n')
 
 # Sources & libraries
-inc_dirs = [abspath('bquery'), np.get_include()]
+inc_dirs = [abspath('bquery')]
+try:
+    import numpy as np
+    inc_dirs.append(np.get_include())
+except ImportError as e:
+    pass
 lib_dirs = []
 libs = []
 def_macros = []
 sources = ['bquery/ctable_ext.pyx']
 
-optional_libs = []
-tests_require = []
+cmdclass = {'build_ext': build_ext}
 
+optional_libs = ['numexpr>=1.4.1']
+install_requires = [
+    'pip>=8.1.2',
+    'setuptools>=27.3',
+    'numpy>=1.7',
+    'bcolz>=1.1.3'
+]
+setup_requires = [
+    'cython>=0.22',
+]
+tests_requires = []
 if v < (3,):
-    tests_require.extend(['unittest2', 'mock'])
+    tests_requires.extend(['unittest2', 'mock'])
 
-setup(
-    name="bquery",
-    version='0.2.0.0',
-    # version={
-    #     'version_scheme': 'guess-next-dev',
-    #     'local_scheme': 'dirty-tag',
-    #     'write_to': 'bquery/version.py'
-    # },
-    description='A query and aggregation framework for Bcolz',
-    long_description="""\
-
-Bcolz is a light weight package that provides columnar, chunked data containers that can be compressed either in-memory and on-disk. that are compressed by default not only for reducing memory/disk storage, but also to improve I/O speed. It excels at storing and sequentially accessing large, numerical data sets.
-The bquery framework provides methods to perform query and aggregation operations on bcolz containers, as well as accelerate these operations by pre-processing possible groupby columns. Currently the real-life performance of sum aggregations using on-disk bcolz queries is normally between 1.5 and 3.0 times slower than similar in-memory Pandas aggregations.
-
-    """,
-    classifiers=[
+extras_requires = [
+    'numexpr>=1.4.1'
+]
+ext_modules = [
+    Extension(
+        'bquery.ctable_ext',
+        include_dirs=inc_dirs,
+        define_macros=def_macros,
+        sources=sources,
+        library_dirs=lib_dirs,
+        libraries=libs
+    )
+]
+package_data = {'bquery': ['ctable_ext.pxd']}
+classifiers = [
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Intended Audience :: Information Technology',
@@ -69,41 +106,32 @@ The bquery framework provides methods to perform query and aggregation operation
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
-    ],
+    ]
+
+setup(
+    name="bquery",
+    version=get_version(),
+    description='A query and aggregation framework for Bcolz',
+    long_description=read("README.md"),
+    classifiers=classifiers,
     author='Carst Vaartjes',
     author_email='cvaartjes@visualfabriq.com',
     maintainer='Carst Vaartjes',
     maintainer_email='cvaartjes@visualfabriq.com',
-    url='https://github.com/visualfabriq/bquery',
+    url='https://github.com/visualfabriq/b4query',
     license='MIT',
     platforms=['any'],
-    ext_modules=[
-        Extension(
-            'bquery.ctable_ext',
-            include_dirs=inc_dirs,
-            define_macros=def_macros,
-            sources=sources,
-            library_dirs=lib_dirs,
-            libraries=libs
-        )
-    ],
-    cmdclass={},
-    install_requires=['numpy>=1.7', 'bcolz>=1.1.0'],
-    setup_requires=[
-        'cython>=0.22',
-        'numpy>=1.7',
-        'setuptools>18.0',
-        'setuptools-scm>1.5.4',
-        'bcolz>=1.1.0'
-    ],
-    tests_require=tests_require,
+    ext_modules=ext_modules,
+    cmdclass=cmdclass,
+    install_requires=install_requires,
+    setup_requires=setup_requires,
+    tests_require=tests_requires,
     extras_require=dict(
-        optional=[
-            'numexpr>=1.4.1'
-        ],
-        test=tests_require
+        optional=extras_requires,
+        test=tests_requires
     ),
     packages=find_packages(),
-    package_data={'bquery': ['ctable_ext.pxd']},
+    package_data=package_data,
+    include_package_data=True,
     zip_safe=True
 )
