@@ -26,9 +26,19 @@ install: |
       brew install python3;
       python3 -m venv venv;
       source venv/bin/activate;
+      pip install pip --upgrade
+      pip install setuptools --upgrade
+      pip install --install-option='--no-cython-compile' cython
+      pip install numpy
+      pip install bcolz
       python setup.py build_ext --inplace
 
   else
+      pip install pip --upgrade
+      pip install setuptools --upgrade
+      pip install --install-option='--no-cython-compile' cython
+      pip install numpy
+      pip install bcolz
       python setup.py build_ext --inplace
   fi
 
@@ -36,3 +46,19 @@ script:
 - nosetests bquery
 notifications:
 email: false
+
+
+
+
+os:
+- linux
+- osx
+python:
+- 2.7
+- 3.3
+- 3.4
+- 3.5
+install:
+
+- python setup.py build_ext --inplace
+
