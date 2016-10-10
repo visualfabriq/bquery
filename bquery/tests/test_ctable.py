@@ -403,13 +403,13 @@ class TestCtable(object):
 
     def test_groupby_07(self):
         """
-        test_groupby_07: Groupby type 'count_na'
+        test_groupby_07: Groupby type 'count'
         """
         random.seed(1)
 
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
-        agg_list = [['f4', 'count_na'], ['f5', 'count_na'], ['f6', 'count_na']]
+        agg_list = [['f4', 'count'], ['f5', 'count'], ['f6', 'count']]
         num_rows = 1000
 
         # -- Data --
