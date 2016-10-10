@@ -11,7 +11,7 @@ Changes from 0.2.2 to 0.2.3
 Changes from 0.2.1 to 0.2.2
 =======================
 
-- Pip package setup
+- Pip package setup (no more pre-setup dependency on numpy)
 
 
 Changes from 0.2.0 to 0.2.1
