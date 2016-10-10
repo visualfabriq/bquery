@@ -2,6 +2,17 @@
 Release notes for bquery
 ========================
 
+Changes from 0.2.2 to 0.2.3
+=======================
+
+- Optimized cython to prevent incorrect emits and to simplify logic by some duplication instead of if/then/else inside large loops
+- Improved multi-processing collision avoidance during the generation of factor columns
+
+Changes from 0.2.1 to 0.2.2
+=======================
+
+- Pip package setup
+
 
 Changes from 0.2.0 to 0.2.1
 =======================

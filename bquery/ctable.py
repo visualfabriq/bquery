@@ -111,16 +111,22 @@ class ctable(bcolz.ctable):
                 _, values = \
                     ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
-                shutil.rmtree(col_factor_rootdir, ignore_errors=True)
-                shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
 
-                # create values
-                carray_values = \
-                    bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype),
-                                 rootdir=col_values_rootdir_tmp, mode='w')
-                carray_values.flush()
-                shutil.rmtree(col_values_rootdir, ignore_errors=True)
-                shutil.move(col_values_rootdir_tmp, col_values_rootdir)
+                if not self.cache_valid(col):
+                    # we check again for cache valid because in multi-processing scenarios,
+                    # another process can have created and filled this factor column in the mean time
+                    shutil.rmtree(col_factor_rootdir, ignore_errors=True)
+                    shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
+
+                    # create values
+                    carray_values = \
+                        bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype),
+                                     rootdir=col_values_rootdir_tmp, mode='w')
+                    carray_values.flush()
+                    shutil.rmtree(col_values_rootdir, ignore_errors=True)
+                    shutil.move(col_values_rootdir_tmp, col_values_rootdir)
+                else:
+                    shutil.rmtree(col_factor_rootdir_tmp, ignore_errors=True)
 
     def unique(self, col_or_col_list):
         """
@@ -344,7 +350,7 @@ class ctable(bcolz.ctable):
         del value_arr
         return result_carray
 
-    def create_group_column_factor(self, factor_list, groupby_cols, cache=False):
+    def create_group_column_factor(self, factor_list, groupby_cols, cache=False, override_cache=False):
         """
         Create a unique, factorized column out of a lost of individual columns
 
@@ -379,19 +385,28 @@ class ctable(bcolz.ctable):
         carray_factor = \
             bcolz.carray([], dtype='int64', expectedlen=self.size, rootdir=col_factor_rootdir_tmp, mode='w')
         carray_factor, values = ctable_ext.factorize(group_array, labels=carray_factor)
-        if cache:
-            carray_factor.flush()
-            shutil.rmtree(col_factor_rootdir, ignore_errors=True)
-            shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
-            carray_factor = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
+        carray_factor.flush()
 
-        carray_values = \
-            bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir_tmp, mode='w')
-        if cache:
-            carray_values.flush()
-            shutil.rmtree(col_values_rootdir, ignore_errors=True)
-            shutil.move(col_values_rootdir_tmp, col_values_rootdir)
+        if cache and not override_cache and self.group_cache_valid(groupby_cols):
+            # another process created the cache in the mean time
+            # there is a group cache that we can use, so we remove our work and use the existing
+            shutil.rmtree(col_factor_rootdir_tmp, ignore_errors=True)
+            carray_factor = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
             carray_values = bcolz.carray(rootdir=col_values_rootdir, mode='r')
+        else:
+            if cache:
+                shutil.rmtree(col_factor_rootdir, ignore_errors=True)
+                shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
+                carray_factor = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
+
+            carray_values = \
+                bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir_tmp, mode='w')
+            carray_values.flush()
+
+            if cache:
+                shutil.rmtree(col_values_rootdir, ignore_errors=True)
+                shutil.move(col_values_rootdir_tmp, col_values_rootdir)
+                carray_values = bcolz.carray(rootdir=col_values_rootdir, mode='r')
 
         del group_array
         if cache:
