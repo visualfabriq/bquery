@@ -17,32 +17,6 @@ from libc.string cimport strcpy
 from khash cimport *
 
 # ----------------------------------------------------------------------------
-#                        GLOBAL DEFINITIONS
-# ----------------------------------------------------------------------------
-
-SUM = 0
-DEF _SUM = 0
-
-MEAN = 5
-DEF _MEAN = 5
-
-STDEV = 6
-DEF _STDEV = 6
-
-COUNT = 1
-DEF _COUNT = 1
-
-COUNT_NA = 2
-DEF _COUNT_NA = 2
-
-COUNT_DISTINCT = 3
-DEF _COUNT_DISTINCT = 3
-
-SORTED_COUNT_DISTINCT = 4
-DEF _SORTED_COUNT_DISTINCT = 4
-# ----------------------------------------------------------------------------
-
-# ----------------------------------------------------------------------------
 #                        FUSED TYPES
 # ----------------------------------------------------------------------------
 # fused types (templating) from
@@ -445,13 +419,13 @@ cdef count_unique(np.ndarray[numpy_native_number_input] values):
 
     return count
 
+
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cpdef aggregate(carray ca_input, carray ca_factor,
+cpdef aggregate_sum(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key,
                np.ndarray[numpy_native_number_input] in_buffer,
-               np.ndarray[numpy_native_number_output] out_buffer,
-               agg_method):
+               np.ndarray[numpy_native_number_output] out_buffer):
 
     # fused type conversion
     if numpy_native_number_input is np.int64_t:
@@ -484,6 +458,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
     # for count distinct
     table = kh_init_str()
     sep = '|'.encode()
+    last_values = np.zeros(nr_groups, dtype=p_dtype)
 
     # standard
     count = 0
@@ -501,12 +476,6 @@ cpdef aggregate(carray ca_input, carray ca_factor,
     else:
         factor_buffer = ca_factor.leftover_array
     factor_chunk_row = 0
-
-    # create special buffers for complex operations
-    if agg_method == _MEAN or agg_method == _STDEV:
-        count_buffer = np.zeros(nr_groups, dtype='int64')
-    if agg_method == _STDEV:
-        mean_buffer = np.zeros(nr_groups, dtype='float64')
 
     for input_chunk_nr in range(ca_input.nchunks):
         # fill input buffer
@@ -532,61 +501,7 @@ cpdef aggregate(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += <numpy_native_number_output> in_buffer[i]
-                elif agg_method == _MEAN:
-                    # method from Knuth
-                    count_buffer[current_index] += 1
-                    delta = in_buffer[i] - out_buffer[current_index]
-                    out_buffer[current_index] += delta / count_buffer[current_index]
-                elif agg_method == _STDEV:
-                    count_buffer[current_index] += 1
-                    delta = in_buffer[i] - mean_buffer[current_index]
-                    mean_buffer[current_index] += delta / count_buffer[current_index]
-                    # M2 = M2 + delta*(x - mean)
-                    out_buffer[current_index] += delta * (in_buffer[i] - mean_buffer[current_index])
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
-                    v = in_buffer[i]
-                    if not np.isnan(v):  # skip NA values
-                        out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype=p_dtype)
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
-                    last_values[current_index] = v
-                elif agg_method == _COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    # index
-                    tmp_str = str(current_index).encode()
-                    size_1 = len(tmp_str) + 1
-                    element_1 = <char *>malloc(size_1)
-                    strcpy(element_1, tmp_str)
-                    # value
-                    tmp_str = str(v).encode()
-                    size_2 = len(tmp_str) + 1
-                    element_2 = <char *>malloc(size_2)
-                    strcpy(element_2, tmp_str)
-                    # combination
-                    size_3 = size_1 + size_2 + 2
-                    element_3 = <char *>malloc(size_3)
-                    strcpy(element_3, element_1 + sep + element_2)
-                    # hash check
-                    k = kh_get_str(table, element_3)
-                    if k == table.n_buckets:
-                        # first save the new element
-                        k = kh_put_str(table, element_3, &ret)
-                        # then up the amount of values found
-                        out_buffer[current_index] += 1
-                else:
-                    raise NotImplementedError('sumtype not supported')
+                out_buffer[current_index] += <numpy_native_number_output> in_buffer[i]
 
     leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
     if leftover_elements > 0:
@@ -612,65 +527,662 @@ cpdef aggregate(carray ca_input, carray ca_factor,
 
             # update value if it's not an invalid index
             if current_index != skip_key:
-                if agg_method == _SUM:
-                    out_buffer[current_index] += <numpy_native_number_output> in_buffer[i]
-                elif agg_method == _MEAN:
-                    # method from Knuth
-                    count_buffer[current_index] += 1
-                    delta = in_buffer[i] - out_buffer[current_index]
-                    out_buffer[current_index] += delta / count_buffer[current_index]
-                elif agg_method == _STDEV:
-                    count_buffer[current_index] += 1
-                    delta = in_buffer[i] - mean_buffer[current_index]
-                    mean_buffer[current_index] += delta / count_buffer[current_index]
-                    # M2 = M2 + delta*(x - mean)
-                    out_buffer[current_index] += delta * (in_buffer[i] - mean_buffer[current_index])
-                elif agg_method == _COUNT:
-                    out_buffer[current_index] += 1
-                elif agg_method == _COUNT_NA:
-                    v = in_buffer[i]
-                    if not np.isnan(v):  # skip NA values
-                        out_buffer[current_index] += 1
-                elif agg_method == _SORTED_COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    if not count_distinct_started:
-                        count_distinct_started = 1
-                        last_values = np.zeros(nr_groups, dtype=p_dtype)
-                        last_values[0] = v
-                        out_buffer[0] = 1
-                    else:
-                        if v != last_values[current_index]:
-                            out_buffer[current_index] += 1
-                    last_values[current_index] = v
-                elif agg_method == _COUNT_DISTINCT:
-                    v = in_buffer[i]
-                    # index
-                    tmp_str = str(current_index).encode()
-                    size_1 = len(tmp_str) + 1
-                    element_1 = <char *>malloc(size_1)
-                    strcpy(element_1, tmp_str)
-                    # value
-                    tmp_str = str(v).encode()
-                    size_2 = len(tmp_str) + 1
-                    element_2 = <char *>malloc(size_2)
-                    strcpy(element_2, tmp_str)
-                    # combination
-                    size_3 = size_1 + size_2 + 2
-                    element_3 = <char *>malloc(size_3)
-                    strcpy(element_3, element_1 + sep + element_2)
-                    # hash check
-                    k = kh_get_str(table, element_3)
-                    if k == table.n_buckets:
-                        # first save the new element
-                        k = kh_put_str(table, element_3, &ret)
-                        # then up the amount of values found
-                        out_buffer[current_index] += 1
-                else:
-                    raise NotImplementedError('sumtype not supported')
+                out_buffer[current_index] += <numpy_native_number_output> in_buffer[i]
 
-    if agg_method == _STDEV:
-        for i in range(len(out_buffer)):
-            out_buffer[i] = np.sqrt(out_buffer[i] / (count_buffer[i]))
+    # check whether a row has to be removed if it was meant to be skipped
+    if skip_key < nr_groups:
+        np.delete(out_buffer, skip_key)
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cpdef aggregate_mean(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key,
+               np.ndarray[numpy_native_number_input] in_buffer,
+               np.ndarray[np.float64_t] out_buffer):
+
+    # fused type conversion
+    if numpy_native_number_input is np.int64_t:
+       p_dtype = np.int64
+    elif numpy_native_number_input is np.int32_t:
+       p_dtype = np.int32
+    elif numpy_native_number_input is np.float64_t:
+       p_dtype = np.float64
+
+    cdef:
+        chunk input_chunk, factor_chunk
+        Py_ssize_t input_chunk_nr, input_chunk_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
+
+        np.ndarray[np.int64_t] factor_buffer
+
+        np.ndarray[numpy_native_number_input] last_values
+
+        numpy_native_number_input v
+        bint count_distinct_started = 0
+        carray num_uniques
+
+        kh_str_t *table
+        char *element_1
+        char *element_2
+        char *element_3
+        int ret, size_1, size_2, size_3
+
+    # for count distinct
+    table = kh_init_str()
+    sep = '|'.encode()
+    last_values = np.zeros(nr_groups, dtype=p_dtype)
+
+    # standard
+    count = 0
+    ret = 0
+    reverse = {}
+
+    input_chunk_len = ca_input.chunklen
+    factor_chunk_len = ca_factor.chunklen
+    factor_total_chunks = ca_factor.nchunks
+    factor_chunk_nr = 0
+    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
+    if factor_total_chunks > 0:
+        factor_chunk = ca_factor.chunks[factor_chunk_nr]
+        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+    else:
+        factor_buffer = ca_factor.leftover_array
+    factor_chunk_row = 0
+
+    # create special buffers for complex operations
+    count_buffer = np.zeros(nr_groups, dtype='int64')
+
+    for input_chunk_nr in range(ca_input.nchunks):
+        # fill input buffer
+        input_chunk = ca_input.chunks[input_chunk_nr]
+        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+
+        # loop through rows
+        for i in range(input_chunk_len):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                # method from Knuth
+                count_buffer[current_index] += 1
+                delta = in_buffer[i] - out_buffer[current_index]
+                out_buffer[current_index] += delta / count_buffer[current_index]
+
+    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
+    if leftover_elements > 0:
+        # fill input buffer
+        in_buffer = ca_input.leftover_array
+
+        # loop through rows
+        for i in range(leftover_elements):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                # method from Knuth
+                count_buffer[current_index] += 1
+                delta = in_buffer[i] - out_buffer[current_index]
+                out_buffer[current_index] += delta / count_buffer[current_index]
+
+    # check whether a row has to be removed if it was meant to be skipped
+    if skip_key < nr_groups:
+        np.delete(out_buffer, skip_key)
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cpdef aggregate_std(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key,
+               np.ndarray[numpy_native_number_input] in_buffer,
+               np.ndarray[np.float64_t] out_buffer):
+
+    # fused type conversion
+    if numpy_native_number_input is np.int64_t:
+       p_dtype = np.int64
+    elif numpy_native_number_input is np.int32_t:
+       p_dtype = np.int32
+    elif numpy_native_number_input is np.float64_t:
+       p_dtype = np.float64
+
+    cdef:
+        chunk input_chunk, factor_chunk
+        Py_ssize_t input_chunk_nr, input_chunk_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
+
+        np.ndarray[np.int64_t] factor_buffer
+
+        np.ndarray[numpy_native_number_input] last_values
+
+        numpy_native_number_input v
+        bint count_distinct_started = 0
+        carray num_uniques
+
+        kh_str_t *table
+        char *element_1
+        char *element_2
+        char *element_3
+        int ret, size_1, size_2, size_3
+
+    # for count distinct
+    table = kh_init_str()
+    sep = '|'.encode()
+    last_values = np.zeros(nr_groups, dtype=p_dtype)
+
+    # standard
+    count = 0
+    ret = 0
+    reverse = {}
+
+    input_chunk_len = ca_input.chunklen
+    factor_chunk_len = ca_factor.chunklen
+    factor_total_chunks = ca_factor.nchunks
+    factor_chunk_nr = 0
+    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
+    if factor_total_chunks > 0:
+        factor_chunk = ca_factor.chunks[factor_chunk_nr]
+        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+    else:
+        factor_buffer = ca_factor.leftover_array
+    factor_chunk_row = 0
+
+    # create special buffers for complex operations
+    count_buffer = np.zeros(nr_groups, dtype='int64')
+    mean_buffer = np.zeros(nr_groups, dtype='float64')
+
+    for input_chunk_nr in range(ca_input.nchunks):
+        # fill input buffer
+        input_chunk = ca_input.chunks[input_chunk_nr]
+        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+
+        # loop through rows
+        for i in range(input_chunk_len):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                count_buffer[current_index] += 1
+                delta = in_buffer[i] - mean_buffer[current_index]
+                mean_buffer[current_index] += delta / count_buffer[current_index]
+                # M2 = M2 + delta*(x - mean)
+                out_buffer[current_index] += delta * (in_buffer[i] - mean_buffer[current_index])
+
+    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
+    if leftover_elements > 0:
+        # fill input buffer
+        in_buffer = ca_input.leftover_array
+
+        # loop through rows
+        for i in range(leftover_elements):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                count_buffer[current_index] += 1
+                delta = in_buffer[i] - mean_buffer[current_index]
+                mean_buffer[current_index] += delta / count_buffer[current_index]
+                # M2 = M2 + delta*(x - mean)
+                out_buffer[current_index] += delta * (in_buffer[i] - mean_buffer[current_index])
+
+    for i in range(len(out_buffer)):
+        out_buffer[i] = np.sqrt(out_buffer[i] / (count_buffer[i]))
+
+    # check whether a row has to be removed if it was meant to be skipped
+    if skip_key < nr_groups:
+        np.delete(out_buffer, skip_key)
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cpdef aggregate_count(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key,
+               np.ndarray[numpy_native_number_input] in_buffer,
+               np.ndarray[np.int64_t] out_buffer):
+
+    # fused type conversion
+    if numpy_native_number_input is np.int64_t:
+       p_dtype = np.int64
+    elif numpy_native_number_input is np.int32_t:
+       p_dtype = np.int32
+    elif numpy_native_number_input is np.float64_t:
+       p_dtype = np.float64
+
+    cdef:
+        chunk input_chunk, factor_chunk
+        Py_ssize_t input_chunk_nr, input_chunk_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
+
+        np.ndarray[np.int64_t] factor_buffer
+
+        np.ndarray[numpy_native_number_input] last_values
+
+        numpy_native_number_input v
+        bint count_distinct_started = 0
+        carray num_uniques
+
+        kh_str_t *table
+        char *element_1
+        char *element_2
+        char *element_3
+        int ret, size_1, size_2, size_3
+
+    # for count distinct
+    table = kh_init_str()
+    sep = '|'.encode()
+    last_values = np.zeros(nr_groups, dtype=p_dtype)
+
+    # standard
+    count = 0
+    ret = 0
+    reverse = {}
+
+    input_chunk_len = ca_input.chunklen
+    factor_chunk_len = ca_factor.chunklen
+    factor_total_chunks = ca_factor.nchunks
+    factor_chunk_nr = 0
+    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
+    if factor_total_chunks > 0:
+        factor_chunk = ca_factor.chunks[factor_chunk_nr]
+        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+    else:
+        factor_buffer = ca_factor.leftover_array
+    factor_chunk_row = 0
+
+    for input_chunk_nr in range(ca_input.nchunks):
+        # fill input buffer
+        input_chunk = ca_input.chunks[input_chunk_nr]
+        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+
+        # loop through rows
+        for i in range(input_chunk_len):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                v = in_buffer[i]
+                if not np.isnan(v):  # skip NA values
+                    out_buffer[current_index] += 1
+
+    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
+    if leftover_elements > 0:
+        # fill input buffer
+        in_buffer = ca_input.leftover_array
+
+        # loop through rows
+        for i in range(leftover_elements):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                v = in_buffer[i]
+                if not np.isnan(v):  # skip NA values
+                    out_buffer[current_index] += 1
+
+    # check whether a row has to be removed if it was meant to be skipped
+    if skip_key < nr_groups:
+        np.delete(out_buffer, skip_key)
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cpdef aggregate_sorted_count_distinct(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key,
+               np.ndarray[numpy_native_number_input] in_buffer,
+               np.ndarray[np.int64_t] out_buffer):
+
+    # fused type conversion
+    if numpy_native_number_input is np.int64_t:
+       p_dtype = np.int64
+    elif numpy_native_number_input is np.int32_t:
+       p_dtype = np.int32
+    elif numpy_native_number_input is np.float64_t:
+       p_dtype = np.float64
+
+    cdef:
+        chunk input_chunk, factor_chunk
+        Py_ssize_t input_chunk_nr, input_chunk_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
+
+        np.ndarray[np.int64_t] factor_buffer
+
+        np.ndarray[numpy_native_number_input] last_values
+
+        numpy_native_number_input v
+        bint count_distinct_started = 0
+        carray num_uniques
+
+        kh_str_t *table
+        char *element_1
+        char *element_2
+        char *element_3
+        int ret, size_1, size_2, size_3
+
+    # for count distinct
+    table = kh_init_str()
+    sep = '|'.encode()
+    last_values = np.zeros(nr_groups, dtype=p_dtype)
+
+    # standard
+    count = 0
+    ret = 0
+    reverse = {}
+
+    input_chunk_len = ca_input.chunklen
+    factor_chunk_len = ca_factor.chunklen
+    factor_total_chunks = ca_factor.nchunks
+    factor_chunk_nr = 0
+    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
+    if factor_total_chunks > 0:
+        factor_chunk = ca_factor.chunks[factor_chunk_nr]
+        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+    else:
+        factor_buffer = ca_factor.leftover_array
+    factor_chunk_row = 0
+
+    for input_chunk_nr in range(ca_input.nchunks):
+        # fill input buffer
+        input_chunk = ca_input.chunks[input_chunk_nr]
+        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+
+        # loop through rows
+        for i in range(input_chunk_len):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                v = in_buffer[i]
+                if not count_distinct_started:
+                    count_distinct_started = 1
+                    last_values = np.zeros(nr_groups, dtype=p_dtype)
+                    last_values[0] = v
+                    out_buffer[0] = 1
+                else:
+                    if v != last_values[current_index]:
+                        out_buffer[current_index] += 1
+                last_values[current_index] = v
+
+    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
+    if leftover_elements > 0:
+        # fill input buffer
+        in_buffer = ca_input.leftover_array
+
+        # loop through rows
+        for i in range(leftover_elements):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                v = in_buffer[i]
+                if not count_distinct_started:
+                    count_distinct_started = 1
+                    last_values = np.zeros(nr_groups, dtype=p_dtype)
+                    last_values[0] = v
+                    out_buffer[0] = 1
+                else:
+                    if v != last_values[current_index]:
+                        out_buffer[current_index] += 1
+                last_values[current_index] = v
+
+    # check whether a row has to be removed if it was meant to be skipped
+    if skip_key < nr_groups:
+        np.delete(out_buffer, skip_key)
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cpdef aggregate_count_distinct(carray ca_input, carray ca_factor,
+               Py_ssize_t nr_groups, Py_ssize_t skip_key,
+               np.ndarray[numpy_native_number_input] in_buffer,
+               np.ndarray[np.int64_t] out_buffer):
+
+    # fused type conversion
+    if numpy_native_number_input is np.int64_t:
+       p_dtype = np.int64
+    elif numpy_native_number_input is np.int32_t:
+       p_dtype = np.int32
+    elif numpy_native_number_input is np.float64_t:
+       p_dtype = np.float64
+
+    cdef:
+        chunk input_chunk, factor_chunk
+        Py_ssize_t input_chunk_nr, input_chunk_len
+        Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
+
+        np.ndarray[np.int64_t] factor_buffer
+
+        np.ndarray[numpy_native_number_input] last_values
+
+        numpy_native_number_input v
+        bint count_distinct_started = 0
+        carray num_uniques
+
+        kh_str_t *table
+        char *element_1
+        char *element_2
+        char *element_3
+        int ret, size_1, size_2, size_3
+
+    # for count distinct
+    table = kh_init_str()
+    sep = '|'.encode()
+    last_values = np.zeros(nr_groups, dtype=p_dtype)
+
+    # standard
+    count = 0
+    ret = 0
+    reverse = {}
+
+    input_chunk_len = ca_input.chunklen
+    factor_chunk_len = ca_factor.chunklen
+    factor_total_chunks = ca_factor.nchunks
+    factor_chunk_nr = 0
+    factor_buffer = np.empty(factor_chunk_len, dtype='int64')
+    if factor_total_chunks > 0:
+        factor_chunk = ca_factor.chunks[factor_chunk_nr]
+        factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+    else:
+        factor_buffer = ca_factor.leftover_array
+    factor_chunk_row = 0
+
+    for input_chunk_nr in range(ca_input.nchunks):
+        # fill input buffer
+        input_chunk = ca_input.chunks[input_chunk_nr]
+        input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+
+        # loop through rows
+        for i in range(input_chunk_len):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                v = in_buffer[i]
+                # index
+                tmp_str = str(current_index).encode()
+                size_1 = len(tmp_str) + 1
+                element_1 = <char *>malloc(size_1)
+                strcpy(element_1, tmp_str)
+                # value
+                tmp_str = str(v).encode()
+                size_2 = len(tmp_str) + 1
+                element_2 = <char *>malloc(size_2)
+                strcpy(element_2, tmp_str)
+                # combination
+                size_3 = size_1 + size_2 + 2
+                element_3 = <char *>malloc(size_3)
+                strcpy(element_3, element_1 + sep + element_2)
+                # hash check
+                k = kh_get_str(table, element_3)
+                if k == table.n_buckets:
+                    # first save the new element
+                    k = kh_put_str(table, element_3, &ret)
+                    # then up the amount of values found
+                    out_buffer[current_index] += 1
+
+    leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
+    if leftover_elements > 0:
+        # fill input buffer
+        in_buffer = ca_input.leftover_array
+
+        # loop through rows
+        for i in range(leftover_elements):
+
+            # go to next factor buffer if necessary
+            if factor_chunk_row == factor_chunk_len:
+                factor_chunk_nr += 1
+                if factor_chunk_nr < factor_total_chunks:
+                    factor_chunk = ca_factor.chunks[factor_chunk_nr]
+                    factor_chunk._getitem(0, factor_chunk_len, factor_buffer.data)
+                else:
+                    factor_buffer = ca_factor.leftover_array
+                factor_chunk_row = 0
+
+            # retrieve index
+            current_index = factor_buffer[factor_chunk_row]
+            factor_chunk_row += 1
+
+            # update value if it's not an invalid index
+            if current_index != skip_key:
+                v = in_buffer[i]
+                # index
+                tmp_str = str(current_index).encode()
+                size_1 = len(tmp_str) + 1
+                element_1 = <char *>malloc(size_1)
+                strcpy(element_1, tmp_str)
+                # value
+                tmp_str = str(v).encode()
+                size_2 = len(tmp_str) + 1
+                element_2 = <char *>malloc(size_2)
+                strcpy(element_2, tmp_str)
+                # combination
+                size_3 = size_1 + size_2 + 2
+                element_3 = <char *>malloc(size_3)
+                strcpy(element_3, element_1 + sep + element_2)
+                # hash check
+                k = kh_get_str(table, element_3)
+                if k == table.n_buckets:
+                    # first save the new element
+                    k = kh_put_str(table, element_3, &ret)
+                    # then up the amount of values found
+                    out_buffer[current_index] += 1
 
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
@@ -862,6 +1374,8 @@ cpdef apply_where_terms(ctable_iter, list op_list, list value_list, carray boola
     out_check_pos = chunk_len - 1
     out_buffer = np.empty(chunk_len, dtype=np.int8)
     out_index = 0
+    filter_val = 0
+    filter_set = set()
 
     for row in ctable_iter:
         row_bool = True
@@ -920,6 +1434,58 @@ cpdef apply_where_terms(ctable_iter, list op_list, list value_list, carray boola
     # write dangling last array if available
     if 0 < out_index < out_check_pos:
          boolarr.append(out_buffer[0:out_index])
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef apply_where_terms_pure_in(ctable_iter, list value_list, carray boolarr):
+    """
+    Update a boolean array with checks whether the values of a column (col) are in a set (value_set)
+
+    At the moment we assume integer input as it fits the current use cases
+
+    :param array_list:
+    :param op_list:
+    :param value_list:
+    :param boolarr:
+    :return:
+    """
+    cdef:
+        Py_ssize_t total_len, out_index, in_index, chunk_len, out_check_pos, in_check_pos, leftover_elements
+        np.ndarray[np.int8_t] out_buffer
+        set filter_set
+        bint row_bool
+        int filter_val, current_val, array_nr, op_id, current_chunk_nr
+        tuple row
+
+    chunk_len = boolarr.chunklen
+    out_check_pos = chunk_len - 1
+    out_buffer = np.empty(chunk_len, dtype=np.int8)
+    out_index = 0
+    filter_val = 0
+    filter_set = set()
+
+    for row in ctable_iter:
+        row_bool = True
+
+        for current_val, filter_set in zip(row, value_list):
+            if current_val not in filter_set:
+                row_bool = False
+                break
+
+        # write bool result
+        out_buffer[out_index] = row_bool
+
+        # write array if we are at the end of the buffer
+        if out_index == out_check_pos:
+            boolarr.append(out_buffer)
+            out_index = 0
+        else:
+            out_index += 1
+
+    # write dangling last array if available
+    if 0 < out_index < out_check_pos:
+         boolarr.append(out_buffer[0:out_index])
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
