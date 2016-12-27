@@ -261,10 +261,6 @@ class ctable(bcolz.ctable):
         rootdir: the aggregation ctable rootdir
         """
 
-        if not agg_list:
-            raise AttributeError('One or more aggregation operations '
-                                 'need to be defined')
-
         carray_factor, nr_groups, skip_key = \
             self.make_group_index(groupby_cols, bool_arr)
 
