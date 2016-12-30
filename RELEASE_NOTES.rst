@@ -2,6 +2,11 @@
 Release notes for bquery
 ========================
 
+Changes from 0.2.4 to 0.2.5
+=======================
+
+- Switch to a set based sorted count distinct
+
 Changes from 0.2.3 to 0.2.4
 =======================
 
