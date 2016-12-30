@@ -609,7 +609,7 @@ class TestCtable(object):
         groupby_cols = ['f0']
         groupby_lambda = lambda x: x[0]
         agg_list = [['f4', 'sorted_count_distinct'], ['f5', 'sorted_count_distinct'], ['f6', 'sorted_count_distinct']]
-        num_rows = 1000
+        num_rows = 2000
 
         # -- Data --
         g = self.gen_dataset_count_with_NA_09(num_rows)
@@ -668,7 +668,6 @@ class TestCtable(object):
              (0, 3, 2),
              (1, 4, 2)],
             dtype='i8,i8,i8')
-
 
         # -- Bcolz --
         with self.on_disk_data_cleaner(data) as ct:
@@ -757,7 +756,6 @@ class TestCtable(object):
              (0, 3),
              (1, 4)],
             dtype='i8,i8')
-
 
         # -- Bcolz --
         with self.on_disk_data_cleaner(data) as ct:

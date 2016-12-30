@@ -440,30 +440,7 @@ cpdef aggregate_sum(carray ca_input, carray ca_factor,
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
         Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
-
         np.ndarray[np.int64_t] factor_buffer
-
-        np.ndarray[numpy_native_number_input] last_values
-
-        numpy_native_number_input v
-        bint count_distinct_started = 0
-        carray num_uniques
-
-        kh_str_t *table
-        char *element_1
-        char *element_2
-        char *element_3
-        int ret, size_1, size_2, size_3
-
-    # for count distinct
-    table = kh_init_str()
-    sep = '|'.encode()
-    last_values = np.zeros(nr_groups, dtype=p_dtype)
-
-    # standard
-    count = 0
-    ret = 0
-    reverse = {}
 
     input_chunk_len = ca_input.chunklen
     factor_chunk_len = ca_factor.chunklen
@@ -553,30 +530,7 @@ cpdef aggregate_mean(carray ca_input, carray ca_factor,
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
         Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
-
         np.ndarray[np.int64_t] factor_buffer
-
-        np.ndarray[numpy_native_number_input] last_values
-
-        numpy_native_number_input v
-        bint count_distinct_started = 0
-        carray num_uniques
-
-        kh_str_t *table
-        char *element_1
-        char *element_2
-        char *element_3
-        int ret, size_1, size_2, size_3
-
-    # for count distinct
-    table = kh_init_str()
-    sep = '|'.encode()
-    last_values = np.zeros(nr_groups, dtype=p_dtype)
-
-    # standard
-    count = 0
-    ret = 0
-    reverse = {}
 
     input_chunk_len = ca_input.chunklen
     factor_chunk_len = ca_factor.chunklen
@@ -675,30 +629,7 @@ cpdef aggregate_std(carray ca_input, carray ca_factor,
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
         Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
-
         np.ndarray[np.int64_t] factor_buffer
-
-        np.ndarray[numpy_native_number_input] last_values
-
-        numpy_native_number_input v
-        bint count_distinct_started = 0
-        carray num_uniques
-
-        kh_str_t *table
-        char *element_1
-        char *element_2
-        char *element_3
-        int ret, size_1, size_2, size_3
-
-    # for count distinct
-    table = kh_init_str()
-    sep = '|'.encode()
-    last_values = np.zeros(nr_groups, dtype=p_dtype)
-
-    # standard
-    count = 0
-    ret = 0
-    reverse = {}
 
     input_chunk_len = ca_input.chunklen
     factor_chunk_len = ca_factor.chunklen
@@ -803,25 +734,7 @@ cpdef aggregate_count(carray ca_input, carray ca_factor,
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
         Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
-
         np.ndarray[np.int64_t] factor_buffer
-
-        np.ndarray[numpy_native_number_input] last_values
-
-        numpy_native_number_input v
-        bint count_distinct_started = 0
-        carray num_uniques
-
-        kh_str_t *table
-        char *element_1
-        char *element_2
-        char *element_3
-        int ret, size_1, size_2, size_3
-
-    # for count distinct
-    table = kh_init_str()
-    sep = '|'.encode()
-    last_values = np.zeros(nr_groups, dtype=p_dtype)
 
     # standard
     count = 0
@@ -907,7 +820,25 @@ cpdef aggregate_sorted_count_distinct(carray ca_input, carray ca_factor,
                Py_ssize_t nr_groups, Py_ssize_t skip_key,
                np.ndarray[numpy_native_number_input] in_buffer,
                np.ndarray[np.int64_t] out_buffer):
+    """
+    Sorted Count Distincts are count distincts where you are allowed to assume that the value we are counting the
+    distinct values off, will not re-occur.
+    Which is why you assume a "sorted" columns (hence the sorted count distinct monniker)
 
+
+    Parameters
+    ----------
+    ca_input
+    ca_factor
+    nr_groups
+    skip_key
+    in_buffer
+    out_buffer
+
+    Returns
+    -------
+
+    """
     # fused type conversion
     if numpy_native_number_input is np.int64_t:
        p_dtype = np.int64
@@ -920,31 +851,16 @@ cpdef aggregate_sorted_count_distinct(carray ca_input, carray ca_factor,
         chunk input_chunk, factor_chunk
         Py_ssize_t input_chunk_nr, input_chunk_len
         Py_ssize_t factor_chunk_nr, factor_chunk_len, factor_chunk_row
-        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements
-
+        Py_ssize_t current_index, i, j, end_counts, start_counts, factor_total_chunks, leftover_elements, to_index
         np.ndarray[np.int64_t] factor_buffer
-
         np.ndarray[numpy_native_number_input] last_values
+        bint prev_found
 
-        numpy_native_number_input v
-        bint count_distinct_started = 0
-        carray num_uniques
+        numpy_native_number_input v, prev_v
+        set index_set
 
-        kh_str_t *table
-        char *element_1
-        char *element_2
-        char *element_3
-        int ret, size_1, size_2, size_3
-
-    # for count distinct
-    table = kh_init_str()
-    sep = '|'.encode()
-    last_values = np.zeros(nr_groups, dtype=p_dtype)
-
-    # standard
-    count = 0
-    ret = 0
-    reverse = {}
+    index_set = set()
+    prev_found = False
 
     input_chunk_len = ca_input.chunklen
     factor_chunk_len = ca_factor.chunklen
@@ -962,6 +878,10 @@ cpdef aggregate_sorted_count_distinct(carray ca_input, carray ca_factor,
         # fill input buffer
         input_chunk = ca_input.chunks[input_chunk_nr]
         input_chunk._getitem(0, input_chunk_len, in_buffer.data)
+        if input_chunk_nr == 0:
+            # first row
+            prev_v = in_buffer[0]
+            prev_found = True
 
         # loop through rows
         for i in range(input_chunk_len):
@@ -983,20 +903,24 @@ cpdef aggregate_sorted_count_distinct(carray ca_input, carray ca_factor,
             # update value if it's not an invalid index
             if current_index != skip_key:
                 v = in_buffer[i]
-                if not count_distinct_started:
-                    count_distinct_started = 1
-                    last_values = np.zeros(nr_groups, dtype=p_dtype)
-                    last_values[0] = v
-                    out_buffer[0] = 1
-                else:
-                    if v != last_values[current_index]:
-                        out_buffer[current_index] += 1
-                last_values[current_index] = v
+
+                if v != prev_v:
+                    # we have a change in the tracked value, write the results
+                    for to_index in index_set:
+                        out_buffer[to_index] += 1
+                    index_set.clear()
+                # save current index
+                index_set.add(current_index)
+                # save previous value for comparison
+                prev_v = v
 
     leftover_elements = cython.cdiv(ca_input.leftover, ca_input.atomsize)
     if leftover_elements > 0:
         # fill input buffer
         in_buffer = ca_input.leftover_array
+        if not prev_found:
+            # first row
+            prev_v = in_buffer[0]
 
         # loop through rows
         for i in range(leftover_elements):
@@ -1018,15 +942,21 @@ cpdef aggregate_sorted_count_distinct(carray ca_input, carray ca_factor,
             # update value if it's not an invalid index
             if current_index != skip_key:
                 v = in_buffer[i]
-                if not count_distinct_started:
-                    count_distinct_started = 1
-                    last_values = np.zeros(nr_groups, dtype=p_dtype)
-                    last_values[0] = v
-                    out_buffer[0] = 1
-                else:
-                    if v != last_values[current_index]:
-                        out_buffer[current_index] += 1
-                last_values[current_index] = v
+
+                if v != prev_v:
+                    # we have a change in the tracked value, write the results
+                    for to_index in index_set:
+                        out_buffer[to_index] += 1
+                    index_set.clear()
+
+                # save current index
+                index_set.add(current_index)
+                # save previous value for comparison
+                prev_v = v
+
+    # write last result
+    for to_index in index_set:
+        out_buffer[to_index] += 1
 
     # check whether a row has to be removed if it was meant to be skipped
     if skip_key < nr_groups:
