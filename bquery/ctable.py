@@ -723,7 +723,7 @@ class ctable(bcolz.ctable):
             elif filter_operator in ['<=']:
                 valid = any(val for val in col_values if val >= filter_value)
             else:
-                raise KeyError(unicode(filter_operator) + ' is not an accepted operator for filtering')
+                raise KeyError(str(filter_operator) + ' is not an accepted operator for filtering')
 
             # if one of the filters is blocking, we can stop
             if not valid:
