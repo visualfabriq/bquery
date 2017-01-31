@@ -2,6 +2,11 @@
 Release notes for bquery
 ========================
 
+Changes from 0.2.7 to 0.2.8
+=======================
+
+- Quick filter check translation fix
+
 Changes from 0.2.6 to 0.2.7
 =======================
 

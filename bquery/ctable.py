@@ -700,11 +700,13 @@ class ctable(bcolz.ctable):
 
                 # optimize lists of 1 value
                 if len(filter_value) == 1:
+                    filter_value = filter_value[0]
                     if filter_operator == 'in':
                         filter_operator = '=='
                     else:
-                        op_id = '!='
-                filter_value = set(filter_value)
+                        filter_operator = '!='
+                else:
+                    filter_value = set(filter_value)
 
             if filter_operator in ['==', 'eq']:
                 valid = filter_value in col_values
