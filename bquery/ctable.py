@@ -1,5 +1,5 @@
 # internal imports
-from bquery import ctable_ext
+from bquery import ctable_ext, carray
 import tempfile
 import os
 import shutil
@@ -11,7 +11,7 @@ import bcolz
 class ctable(bcolz.ctable):
     def __init__(self, *args, **kwargs):
         super(ctable, self).__init__(*args, **kwargs)
-        if self.rootdir and kwargs.get('auto_cache') is not False:
+        if self.rootdir and kwargs.get('auto_cache') is not False and kwargs.get('mode') != 'r':
             self.auto_cache = True
         else:
             self.auto_cache = False
@@ -653,6 +653,83 @@ class ctable(bcolz.ctable):
         ctable_ext.apply_where_terms(ctable_iter, op_list, value_list, boolarr)
 
         return boolarr
+
+    def where_terms_factorization_check(self, term_list):
+        """
+        check for where terms if they are applicable
+        Create a boolean array where `term_list` is true.
+        A terms list has a [(col, operator, value), ..] construction.
+        Eg. [('sales', '>', 2), ('state', 'in', ['IL', 'AR'])]
+
+        :param term_list:
+        :param outcols:
+        :param limit:
+        :param skip:
+        :return: :raise ValueError:
+        """
+
+        if type(term_list) not in [list, set, tuple]:
+            raise ValueError("Only term lists are supported")
+
+        valid = True
+
+        for term in term_list:
+            # get terms
+            filter_col = term[0]
+            filter_operator = term[1].lower().strip(' ')
+            filter_value = term[2]
+
+            # check values
+            if filter_col not in self.cols:
+                raise KeyError(unicode(filter_col) + ' not in table')
+
+            col_values_rootdir = os.path.join(self.rootdir, filter_col + '.values')
+
+            if not os.path.exists(col_values_rootdir):
+                # no factorization available
+                break
+
+            col_carray = carray(rootdir=col_values_rootdir, mode='r')
+            col_values = set(col_carray)
+
+            if filter_operator in ['in', 'not in', 'nin']:
+                if type(filter_value) not in [list, set, tuple]:
+                    raise ValueError("In selections need lists, sets or tuples")
+                if len(filter_value) < 1:
+                    raise ValueError("A value list needs to have values")
+
+                # optimize lists of 1 value
+                if len(filter_value) == 1:
+                    if filter_operator == 'in':
+                        filter_operator = '=='
+                    else:
+                        op_id = '!='
+                filter_value = set(filter_value)
+
+            if filter_operator in ['==', 'eq']:
+                valid = filter_value in col_values
+            elif filter_operator in ['!=', 'neq']:
+                valid = any(val for val in col_values if val != filter_value)
+            elif filter_operator in ['in']:
+                valid = any(val for val in filter_value if val in col_values)
+            elif filter_operator in ['nin', 'not in']:
+                valid = any(val for val in col_values if val not in filter_value)
+            elif filter_operator in ['>']:
+                valid = any(val for val in col_values if val > filter_value)
+            elif filter_operator in ['>=']:
+                valid = any(val for val in col_values if val >= filter_value)
+            elif filter_operator in ['<']:
+                valid = any(val for val in col_values if val < filter_value)
+            elif filter_operator in ['<=']:
+                valid = any(val for val in col_values if val >= filter_value)
+            else:
+                raise KeyError(unicode(filter_operator) + ' is not an accepted operator for filtering')
+
+            # if one of the filters is blocking, we can stop
+            if not valid:
+                break
+
+        return valid
 
     def is_in_ordered_subgroups(self, basket_col=None, bool_arr=None,
                                 _max_len_subgroup=1000):

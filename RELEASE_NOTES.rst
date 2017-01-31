@@ -2,6 +2,12 @@
 Release notes for bquery
 ========================
 
+Changes from 0.2.5 to 0.2.6
+=======================
+
+- Only turn on auto factorization if the access mode is not 'r'
+- Added a quick filter check that uses value factorization
+
 Changes from 0.2.4 to 0.2.5
 =======================
 
