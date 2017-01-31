@@ -1,5 +1,5 @@
 # internal imports
-from bquery import ctable_ext, carray
+from bquery import ctable_ext
 import tempfile
 import os
 import shutil
@@ -689,7 +689,7 @@ class ctable(bcolz.ctable):
                 # no factorization available
                 break
 
-            col_carray = carray(rootdir=col_values_rootdir, mode='r')
+            col_carray = bcolz.carray(rootdir=col_values_rootdir, mode='r')
             col_values = set(col_carray)
 
             if filter_operator in ['in', 'not in', 'nin']:

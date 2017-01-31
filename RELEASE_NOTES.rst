@@ -2,6 +2,11 @@
 Release notes for bquery
 ========================
 
+Changes from 0.2.6 to 0.2.7
+=======================
+
+- Improved import
+
 Changes from 0.2.5 to 0.2.6
 =======================
 
