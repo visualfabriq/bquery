@@ -843,6 +843,8 @@ class ctable(bcolz.ctable):
 
         if self.auto_cache and bool_arr.rootdir is not None:
             rootdir = self.create_tmp_rootdir()
+        else:
+            rootdir = None
 
         return \
             ctable_ext.is_in_ordered_subgroups(
