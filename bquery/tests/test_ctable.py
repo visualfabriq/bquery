@@ -991,7 +991,7 @@ class TestCtable(object):
         # generate data
         iterable = ((x, x % 5) for x in range(20000))
         data = np.fromiter(iterable, dtype='i8,i8')
-        ct = bquery.ctable(data, rootdir=self.rootdir)
+        ct = bquery.ctable(data, rootdir=tempfile.mkdtemp(prefix='bcolz-'), mode='w')
 
         # factorize - check the only factirized col. [0]
         fact_1 = ct.factorize_groupby_cols(['f1'])

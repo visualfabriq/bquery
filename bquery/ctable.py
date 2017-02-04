@@ -3,18 +3,55 @@ from bquery import ctable_ext
 import tempfile
 import os
 import shutil
+import uuid
 
 # external imports
 import numpy as np
 import bcolz
 
+
+def rm_file_or_dir(path, ignore_errors=True):
+    """
+    Helper function to clean a certain filepath
+
+    Parameters
+    ----------
+    path
+
+    Returns
+    -------
+
+    """
+    if os.path.exists(path):
+        if os.path.isdir(path):
+            if os.path.islink(path):
+                os.unlink(path)
+            else:
+                shutil.rmtree(path, ignore_errors=ignore_errors)
+        else:
+            if os.path.islink(path):
+                os.unlink(path)
+            else:
+                os.remove(path)
+
+
 class ctable(bcolz.ctable):
     def __init__(self, *args, **kwargs):
         super(ctable, self).__init__(*args, **kwargs)
-        if self.rootdir and kwargs.get('auto_cache') is not False and kwargs.get('mode') != 'r':
+
+        # check autocaching
+        if self.rootdir and kwargs.get('auto_cache') is True:
+            # explicit auto_cache
+            self.auto_cache = True
+        elif self.rootdir and kwargs.get('auto_cache') is None and kwargs.get('mode') != 'r':
+            # implicit auto_cache
             self.auto_cache = True
         else:
             self.auto_cache = False
+
+        self.auto_cache = True  # debug
+
+        self._dir_clean_list = []
 
     @staticmethod
     def create_group_base_name(col_list):
@@ -33,9 +70,7 @@ class ctable(bcolz.ctable):
         if self.rootdir:
             col_org_file_check = self[col].rootdir + '/__attrs__'
             col_values_file_check = self[col].rootdir + '.values/__attrs__'
-
-            if os.path.exists(col_org_file_check) and os.path.exists(col_values_file_check):
-                cache_valid = os.path.getctime(col_org_file_check) < os.path.getctime(col_values_file_check)
+            cache_valid = os.path.exists(col_org_file_check) and os.path.exists(col_values_file_check)
 
         return cache_valid
 
@@ -54,11 +89,7 @@ class ctable(bcolz.ctable):
 
             exists_group_index = os.path.exists(col_values_file_check)
             missing_col_check = [1 for col in col_list if not os.path.exists(self[col].rootdir + '/__attrs__')]
-
-            if exists_group_index and not missing_col_check:
-                group_col_timestamp = os.path.getctime(col_values_file_check)
-                col_timestamp_list = [os.path.getctime(self[col].rootdir + '/__attrs__') for col in col_list]
-                cache_valid = max(col_timestamp_list) < group_col_timestamp
+            cache_valid = (exists_group_index and not missing_col_check)
 
         return cache_valid
 
@@ -87,12 +118,14 @@ class ctable(bcolz.ctable):
         if refresh:
             kill_list = [x for x in os.listdir(self.rootdir) if '.factor' in x or '.values' in x]
             for kill_dir in kill_list:
-                shutil.rmtree(os.path.join(self.rootdir, kill_dir))
+                rm_file_or_dir(os.path.join(self.rootdir, kill_dir))
 
         for col in col_list:
 
             # create cache if needed
             if refresh or not self.cache_valid(col):
+                # todo: also add locking mechanism here
+
                 # create directories
                 col_rootdir = self[col].rootdir
                 col_factor_rootdir = col_rootdir + '.factor'
@@ -108,21 +141,18 @@ class ctable(bcolz.ctable):
                     ctable_ext.factorize(self[col], labels=carray_factor)
                 carray_factor.flush()
 
-                if not self.cache_valid(col):
-                    # we check again for cache valid because in multi-processing scenarios,
-                    # another process can have created and filled this factor column in the mean time
-                    shutil.rmtree(col_factor_rootdir, ignore_errors=True)
-                    shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
+                rm_file_or_dir(col_factor_rootdir, ignore_errors=True)
+                shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
 
-                    # create values
-                    carray_values = \
-                        bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype),
-                                     rootdir=col_values_rootdir_tmp, mode='w')
-                    carray_values.flush()
-                    shutil.rmtree(col_values_rootdir, ignore_errors=True)
-                    shutil.move(col_values_rootdir_tmp, col_values_rootdir)
-                else:
-                    shutil.rmtree(col_factor_rootdir_tmp, ignore_errors=True)
+                # create values
+                carray_values = \
+                    bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype),
+                                 rootdir=col_values_rootdir_tmp, mode='w')
+                carray_values.flush()
+                rm_file_or_dir(col_values_rootdir, ignore_errors=True)
+                shutil.move(col_values_rootdir_tmp, col_values_rootdir)
+            else:
+                rm_file_or_dir(col_factor_rootdir_tmp, ignore_errors=True)
 
     def unique(self, col_or_col_list):
         """
@@ -282,6 +312,9 @@ class ctable(bcolz.ctable):
                               agg_ops, dtype_dict,
                               bool_arr=bool_arr)
 
+        # clean up everything that was used
+        self.clean_tmp_rootdir()
+
         return ct_agg
 
     # groupby helper functions
@@ -352,9 +385,9 @@ class ctable(bcolz.ctable):
         del value_arr
         return result_carray
 
-    def create_group_column_factor(self, factor_list, groupby_cols, cache=False, override_cache=False):
+    def create_group_column_factor(self, factor_list, groupby_cols, cache=False):
         """
-        Create a unique, factorized column out of a lost of individual columns
+        Create a unique, factorized column out of several individual columns
 
         Parameters
         ----------
@@ -366,18 +399,21 @@ class ctable(bcolz.ctable):
         -------
 
         """
-        if cache:
-            col_rootdir = os.path.join(self.rootdir, self.create_group_base_name(groupby_cols))
-            col_factor_rootdir = col_rootdir + '.factor'
-            col_factor_rootdir_tmp = tempfile.mkdtemp(prefix='bcolz-')
-            col_values_rootdir = col_rootdir + '.values'
-            col_values_rootdir_tmp = tempfile.mkdtemp(prefix='bcolz-')
-            input_rootdir = tempfile.mkdtemp(prefix='bcolz-')
-        else:
+        if not self.rootdir:
+            # in-memory scenario
             input_rootdir = None
+            col_rootdir = None
+            col_factor_rootdir = None
+            col_values_rootdir = None
             col_factor_rootdir_tmp = None
             col_values_rootdir_tmp = None
+        else:
+            # temporary
+            input_rootdir = tempfile.mkdtemp(prefix='bcolz-')
+            col_factor_rootdir_tmp = tempfile.mkdtemp(prefix='bcolz-')
+            col_values_rootdir_tmp = tempfile.mkdtemp(prefix='bcolz-')
 
+        # create combination of groupby columns
         group_array = bcolz.zeros(0, dtype=np.int64, expectedlen=len(self), rootdir=input_rootdir, mode='w')
         factor_table = bcolz.ctable(factor_list, names=groupby_cols)
         ctable_iter = factor_table.iter(outcols=groupby_cols, out_flavor=tuple)
@@ -389,31 +425,52 @@ class ctable(bcolz.ctable):
         carray_factor, values = ctable_ext.factorize(group_array, labels=carray_factor)
         carray_factor.flush()
 
-        if cache and not override_cache and self.group_cache_valid(groupby_cols):
-            # another process created the cache in the mean time
-            # there is a group cache that we can use, so we remove our work and use the existing
-            shutil.rmtree(col_factor_rootdir_tmp, ignore_errors=True)
-            carray_factor = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
-            carray_values = bcolz.carray(rootdir=col_values_rootdir, mode='r')
-        else:
-            if cache:
-                shutil.rmtree(col_factor_rootdir, ignore_errors=True)
-                shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
-                carray_factor = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
-
-            carray_values = \
-                bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir_tmp, mode='w')
-            carray_values.flush()
-
-            if cache:
-                shutil.rmtree(col_values_rootdir, ignore_errors=True)
-                shutil.move(col_values_rootdir_tmp, col_values_rootdir)
-                carray_values = bcolz.carray(rootdir=col_values_rootdir, mode='r')
+        carray_values = \
+            bcolz.carray(np.fromiter(values.values(), dtype=np.int64), rootdir=col_values_rootdir_tmp, mode='w')
+        carray_values.flush()
 
         del group_array
         if cache:
             # clean up the temporary file
-            shutil.rmtree(input_rootdir, ignore_errors=True)
+            rm_file_or_dir(input_rootdir, ignore_errors=True)
+
+        if cache:
+            # official end destination
+            col_rootdir = os.path.join(self.rootdir, self.create_group_base_name(groupby_cols))
+            col_factor_rootdir = col_rootdir + '.factor'
+            col_values_rootdir = col_rootdir + '.values'
+            lock_file = col_rootdir + '.lock'
+
+            # only works for linux
+            if not os.path.exists(lock_file):
+                uid = str(uuid.uuid4())
+                try:
+                    with open(lock_file, 'a+') as fn:
+                        fn.write(uid + '\n')
+                    with open(lock_file, 'r') as fn:
+                        temp = fn.read().splitlines()
+                    if temp[0] == uid:
+                        lock = True
+                    else:
+                        lock = False
+                    del temp
+                except:
+                    lock = False
+            else:
+                lock = False
+
+            if lock:
+                rm_file_or_dir(col_factor_rootdir, ignore_errors=False)
+                shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
+                carray_factor = bcolz.carray(rootdir=col_factor_rootdir, mode='r')
+
+                rm_file_or_dir(col_values_rootdir, ignore_errors=False)
+                shutil.move(col_values_rootdir_tmp, col_values_rootdir)
+                carray_values = bcolz.carray(rootdir=col_values_rootdir, mode='r')
+            else:
+                # another process has a lock, we will work with our current files and clean up later
+                self._dir_clean_list.append(col_factor_rootdir)
+                self._dir_clean_list.append(col_values_rootdir)
 
         return carray_factor, carray_values
 
@@ -424,7 +481,6 @@ class ctable(bcolz.ctable):
                 factor_list:
                 values_list:
                 groupby_cols:
-                array_length:
                 bool_arr:
 
             Returns:
@@ -432,14 +488,14 @@ class ctable(bcolz.ctable):
                 int: (nr_groups) the number of resulting groups
                 int: (skip_key)
         '''
-        array_length = len(self)
         factor_list, values_list = self.factorize_groupby_cols(groupby_cols)
 
         # create unique groups for groupby loop
         if len(factor_list) == 0:
             # no columns to groupby over, so directly aggregate the measure
-            # columns to 1 total (index 0/zero)
-            carray_factor = bcolz.zeros(array_length, dtype='int64')
+            # columns to 1 total
+            tmp_rootdir = self.create_tmp_rootdir()
+            carray_factor = bcolz.zeros(len(self), dtype='int64', rootdir=tmp_rootdir, mode='w')
             carray_values = ['Total']
         elif len(factor_list) == 1:
             # single column groupby, the groupby output column
@@ -456,26 +512,24 @@ class ctable(bcolz.ctable):
                 carray_factor = bcolz.carray(rootdir=col_factor_rootdir)
                 col_values_rootdir = col_rootdir + '.values'
                 carray_values = bcolz.carray(rootdir=col_values_rootdir)
-            elif self.auto_cache:
-                # create a new group cache
-                carray_factor, carray_values = \
-                    self.create_group_column_factor(factor_list, groupby_cols, cache=True)
             else:
-                # no cached group indexes
-                # create a new group cache
+                # create a brand new groupby col combination
                 carray_factor, carray_values = \
-                    self.create_group_column_factor(factor_list, groupby_cols, cache=False)
+                    self.create_group_column_factor(factor_list, groupby_cols, cache=self.auto_cache)
 
         nr_groups = len(carray_values)
         skip_key = None
 
         if bool_arr is not None:
             # make all non relevant combinations -1
+            tmp_rootdir = self.create_tmp_rootdir()
             carray_factor = bcolz.eval(
                 '(factor + 1) * bool - 1',
-                user_dict={'factor': carray_factor, 'bool': bool_arr})
+                user_dict={'factor': carray_factor, 'bool': bool_arr}, rootdir=tmp_rootdir, mode='w')
             # now check how many unique values there are left
-            carray_factor, values = ctable_ext.factorize(carray_factor)
+            tmp_rootdir = self.create_tmp_rootdir()
+            labels = bcolz.carray([], dtype='int64', expectedlen=len(carray_factor), rootdir=tmp_rootdir, mode='w')
+            carray_factor, values = ctable_ext.factorize(carray_factor, labels)
             # values might contain one value too much (-1) (no direct lookup
             # possible because values is a reversed dict)
             filter_check = \
@@ -494,6 +548,33 @@ class ctable(bcolz.ctable):
             skip_key = nr_groups
 
         return carray_factor, nr_groups, skip_key
+
+    def create_tmp_rootdir(self):
+        """
+        create a rootdir that we can destroy later again
+
+        Returns
+        -------
+
+        """
+        if self.rootdir:
+            tmp_rootdir = tempfile.mkdtemp(prefix='bcolz-')
+            self._dir_clean_list.append(tmp_rootdir)
+        else:
+            tmp_rootdir = None
+        return tmp_rootdir
+
+    def clean_tmp_rootdir(self):
+        """
+        clean up all used temporary rootdirs
+
+        Returns
+        -------
+
+        """
+        for tmp_rootdir in list(self._dir_clean_list):
+            rm_file_or_dir(tmp_rootdir)
+            self._dir_clean_list.remove(tmp_rootdir)
 
     def create_agg_ctable(self, groupby_cols, agg_list, expectedlen, rootdir):
         '''Create a container for the output table, a dictionary describing it's
@@ -575,7 +656,7 @@ class ctable(bcolz.ctable):
 
         return ct_agg, dtype_dict, agg_ops
 
-    def where_terms(self, term_list):
+    def where_terms(self, term_list, cache=False):
         """
         Create a boolean array where `term_list` is true.
         A terms list has a [(col, operator, value), ..] construction.
@@ -647,8 +728,15 @@ class ctable(bcolz.ctable):
             op_list.append(op_id)
             value_list.append(filter_value)
 
+        # rootdir
+        if cache:
+            # nb: this directory is not destroyed until the end of the groupby
+            rootdir = self.create_tmp_rootdir()
+        else:
+            rootdir = None
+
         # create boolean array and fill it
-        boolarr = bcolz.carray(np.ones(0, dtype=np.bool), expectedlen=self.len)
+        boolarr = bcolz.carray(np.ones(0, dtype=np.bool), expectedlen=self.len, rootdir=rootdir, mode='w')
         ctable_iter = self[col_list].iter(out_flavor='tuple')
         ctable_ext.apply_where_terms(ctable_iter, op_list, value_list, boolarr)
 
@@ -735,11 +823,23 @@ class ctable(bcolz.ctable):
 
     def is_in_ordered_subgroups(self, basket_col=None, bool_arr=None,
                                 _max_len_subgroup=1000):
-        """"""
+        """
+        Expands the filter using a specified column
+
+        Parameters
+        ----------
+        basket_col
+        bool_arr
+        _max_len_subgroup
+
+        Returns
+        -------
+
+        """
         assert basket_col is not None
 
         if bool_arr is None:
-            bool_arr = bcolz.ones(self.len)
+            return None
 
         return \
             ctable_ext.is_in_ordered_subgroups(

@@ -2,6 +2,12 @@
 Release notes for bquery
 ========================
 
+Changes from 0.2.8 to 0.2.9
+=======================
+
+- Improved multiprocess file locking
+- Added more out-of-core options to keep memory usage lower
+
 Changes from 0.2.7 to 0.2.8
 =======================
 
