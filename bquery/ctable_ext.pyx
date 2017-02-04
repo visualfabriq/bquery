@@ -1208,7 +1208,7 @@ cpdef groupby_value(carray ca_input, carray ca_factor, Py_ssize_t nr_groups, Py_
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef is_in_ordered_subgroups(carray groups_col, carray bool_arr=None,
-                              _max_len_subgroup=1000):
+                              rootdir=None, _max_len_subgroup=1000):
     """
     Mark whole basket containing certain items
 
@@ -1230,7 +1230,7 @@ cpdef is_in_ordered_subgroups(carray groups_col, carray bool_arr=None,
         np.ndarray bl_basket, bl_bool_arr
 
     max_len_subgroup = _max_len_subgroup
-    ret = bz.zeros(0, dtype='bool', expectedlen=groups_col.len)
+    ret = bz.zeros(0, dtype='bool', expectedlen=groups_col.len, rootdir=rootdir, mode='w')
     blen = min([groups_col.chunklen, bool_arr.chunklen])
     previous_item = groups_col[0]
 
