@@ -841,8 +841,11 @@ class ctable(bcolz.ctable):
         if bool_arr is None:
             return None
 
+        if self.auto_cache and bool_arr.rootdir is not None:
+            rootdir = self.create_tmp_rootdir()
+
         return \
             ctable_ext.is_in_ordered_subgroups(
-                self[basket_col], bool_arr=bool_arr,
+                self[basket_col], bool_arr=bool_arr, rootdir=rootdir,
                 _max_len_subgroup=_max_len_subgroup)
 
