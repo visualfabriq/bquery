@@ -151,8 +151,6 @@ class ctable(bcolz.ctable):
                 carray_values.flush()
                 rm_file_or_dir(col_values_rootdir, ignore_errors=True)
                 shutil.move(col_values_rootdir_tmp, col_values_rootdir)
-            else:
-                rm_file_or_dir(col_factor_rootdir_tmp, ignore_errors=True)
 
     def unique(self, col_or_col_list):
         """
