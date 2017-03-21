@@ -2,6 +2,11 @@
 Release notes for bquery
 ========================
 
+Changes from 0.2.9 to 0.2.10
+=======================
+
+- Fixed a bug with file locking temporary directory removal
+
 Changes from 0.2.8 to 0.2.9
 =======================
 
