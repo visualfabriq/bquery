@@ -1,13 +1,12 @@
-# internal imports
-from bquery import ctable_ext
-import tempfile
 import os
 import shutil
+import tempfile
 import uuid
 
-# external imports
-import numpy as np
 import bcolz
+import numpy as np
+
+from bquery import ctable_ext
 
 
 def rm_file_or_dir(path, ignore_errors=True):
@@ -233,22 +232,22 @@ class ctable(bcolz.ctable):
 
             if agg_op == 'sum':
                 ctable_ext.aggregate_sum(input_col, carray_factor, nr_groups,
-                                     skip_key, input_buffer, output_buffer)
+                                         skip_key, input_buffer, output_buffer)
             elif agg_op == 'mean':
                 ctable_ext.aggregate_mean(input_col, carray_factor, nr_groups,
-                                     skip_key, input_buffer, output_buffer)
+                                          skip_key, input_buffer, output_buffer)
             elif agg_op == 'std':
                 ctable_ext.aggregate_std(input_col, carray_factor, nr_groups,
-                                     skip_key, input_buffer, output_buffer)
+                                         skip_key, input_buffer, output_buffer)
             elif agg_op == 'count':
                 ctable_ext.aggregate_count(input_col, carray_factor, nr_groups,
                                            skip_key, input_buffer, output_buffer)
             elif agg_op == 'count_distinct':
                 ctable_ext.aggregate_count_distinct(input_col, carray_factor, nr_groups,
-                                     skip_key, input_buffer, output_buffer)
+                                                    skip_key, input_buffer, output_buffer)
             elif agg_op == 'sorted_count_distinct':
                 ctable_ext.aggregate_sorted_count_distinct(input_col, carray_factor, nr_groups,
-                                     skip_key, input_buffer, output_buffer)
+                                                           skip_key, input_buffer, output_buffer)
             else:
                 raise KeyError('Unknown aggregation operation ' + str(agg_op))
 
@@ -848,4 +847,3 @@ class ctable(bcolz.ctable):
             ctable_ext.is_in_ordered_subgroups(
                 self[basket_col], bool_arr=bool_arr, rootdir=rootdir,
                 _max_len_subgroup=_max_len_subgroup)
-
