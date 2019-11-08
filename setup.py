@@ -68,7 +68,7 @@ install_requires = [
     'setuptools>=27.3',
     'cython>=0.22',
     'numpy>=1.7',
-    'bcolz>=1.1.0'
+    'bcolz>=1.2.1'
 ]
 setup_requires = [
     'numpy>=1.7',

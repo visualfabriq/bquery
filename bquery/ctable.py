@@ -132,24 +132,27 @@ class ctable(bcolz.ctable):
                 col_values_rootdir = col_rootdir + '.values'
                 col_values_rootdir_tmp = tempfile.mkdtemp(prefix='bcolz-')
 
-                # create factor
-                carray_factor = \
-                    bcolz.carray([], dtype='int64', expectedlen=self.size,
-                                 rootdir=col_factor_rootdir_tmp, mode='w')
-                _, values = \
-                    ctable_ext.factorize(self[col], labels=carray_factor)
-                carray_factor.flush()
+                try:
+                    # create factor
+                    carray_factor = \
+                        bcolz.carray([], dtype='int64', expectedlen=self.size,
+                                     rootdir=col_factor_rootdir_tmp, mode='w')
+                    _, values = \
+                        ctable_ext.factorize(self[col], labels=carray_factor)
+                    carray_factor.flush()
+                finally:
+                    rm_file_or_dir(col_factor_rootdir, ignore_errors=True)
+                    shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
 
-                rm_file_or_dir(col_factor_rootdir, ignore_errors=True)
-                shutil.move(col_factor_rootdir_tmp, col_factor_rootdir)
-
-                # create values
-                carray_values = \
-                    bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype),
-                                 rootdir=col_values_rootdir_tmp, mode='w')
-                carray_values.flush()
-                rm_file_or_dir(col_values_rootdir, ignore_errors=True)
-                shutil.move(col_values_rootdir_tmp, col_values_rootdir)
+                try:
+                    # create values
+                    carray_values = \
+                        bcolz.carray(np.fromiter(values.values(), dtype=self[col].dtype),
+                                     rootdir=col_values_rootdir_tmp, mode='w')
+                    carray_values.flush()
+                finally:
+                    rm_file_or_dir(col_values_rootdir, ignore_errors=True)
+                    shutil.move(col_values_rootdir_tmp, col_values_rootdir)
 
     def unique(self, col_or_col_list):
         """
@@ -288,29 +291,30 @@ class ctable(bcolz.ctable):
         rootdir: the aggregation ctable rootdir
         """
 
-        carray_factor, nr_groups, skip_key = \
-            self.make_group_index(groupby_cols, bool_arr)
+        try:
+            carray_factor, nr_groups, skip_key = \
+                self.make_group_index(groupby_cols, bool_arr)
 
-        # check if the bool_arr actually filters
-        if bool_arr is not None and np.all(bool_arr):
-            bool_arr = None
+            # check if the bool_arr actually filters
+            if bool_arr is not None and np.all(bool_arr):
+                bool_arr = None
 
-        if bool_arr is None:
-            expectedlen = nr_groups
-        else:
-            expectedlen = nr_groups - 1
+            if bool_arr is None:
+                expectedlen = nr_groups
+            else:
+                expectedlen = nr_groups - 1
 
-        ct_agg, dtype_dict, agg_ops = \
-            self.create_agg_ctable(groupby_cols, agg_list, expectedlen, rootdir)
+            ct_agg, dtype_dict, agg_ops = \
+                self.create_agg_ctable(groupby_cols, agg_list, expectedlen, rootdir)
 
-        # perform aggregation
-        self.aggregate_groups(ct_agg, nr_groups, skip_key,
-                              carray_factor, groupby_cols,
-                              agg_ops, dtype_dict,
-                              bool_arr=bool_arr)
-
-        # clean up everything that was used
-        self.clean_tmp_rootdir()
+            # perform aggregation
+            self.aggregate_groups(ct_agg, nr_groups, skip_key,
+                                  carray_factor, groupby_cols,
+                                  agg_ops, dtype_dict,
+                                  bool_arr=bool_arr)
+        finally:
+            # clean up everything that was used
+            self.clean_tmp_rootdir()
 
         return ct_agg
 
