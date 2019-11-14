@@ -75,7 +75,7 @@ setup_requires = [
 ]
 tests_requires = []
 if v < (3,):
-    tests_requires.extend(['unittest2', 'mock', 'pytest'])
+    tests_requires.extend(['unittest2', 'mock'])
 
 extras_requires = [
     'numexpr>=1.4.1'
