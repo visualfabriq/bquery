@@ -1,0 +1,23 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/python:2.7
+
+    working_directory: ~/bquery
+    steps:
+      - checkout:
+      - run:
+          name: Install Module
+          working_directory: bquery
+          command: python setup.py build_ext --inplace && python setup.py install
+      - run:
+          name: Run Tests
+          working_directory: bquery
+          command: pytest -vs tests/
+
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+      - build
