@@ -15,7 +15,8 @@ import os
 from setuptools import setup, Extension, find_packages
 from os.path import abspath
 from sys import version_info as v
-from setuptools.command.build_ext import build_ext as _build_ext
+from Cython.Build import cythonize, build_ext
+import numpy
 
 
 # Check this Python version is supported
@@ -24,16 +25,8 @@ if any([v < (2, 6), (3,) < v < (3, 3)]):
                     "or >= 3.3." % v[:2])
 
 
-class build_ext(_build_ext):
-    def finalize_options(self):
-        _build_ext.finalize_options(self)
-        # Prevent numpy from thinking it is still in its setup process:
-        __builtins__.__NUMPY_SETUP__ = False
-        import numpy
-        self.include_dirs.append(numpy.get_include())
-
-
 HERE = os.path.abspath(os.path.dirname(__file__))
+
 
 def read(*parts):
     """
@@ -48,48 +41,38 @@ def get_version():
     with codecs.open(abspath('VERSION'), "r", "utf-8") as f:
         return f.readline().rstrip('\n')
 
+
 # Sources & libraries
-inc_dirs = [abspath('bquery')]
-try:
-    import numpy as np
-    inc_dirs.append(np.get_include())
-except ImportError as e:
-    pass
-lib_dirs = []
-libs = []
-def_macros = []
 sources = ['bquery/ctable_ext.pyx']
-
-cmdclass = {'build_ext': build_ext}
-
 optional_libs = ['numexpr>=1.4.1']
 install_requires = [
     'pip>=8.1.2',
     'setuptools>=27.3',
     'cython>=0.22',
-    'numpy>=1.7',
     'bcolz>=1.2.1'
 ]
-setup_requires = [
-    'numpy>=1.7',
-]
-tests_requires = []
+setup_requires = []
+tests_requires = ['pytest', 'nose']
 if v < (3,):
-    tests_requires.extend(['unittest2', 'mock', 'pytest'])
+    tests_requires.extend(['unittest2', 'mock'])
+    install_requires.extend(['numpy<=1.16.4'])
+    setup_requires.extend(['numpy<=1.16.4'])
+else:
+    install_requires.extend(['numpy'])
+    setup_requires.extend(['numpy'])
 
 extras_requires = [
     'numexpr>=1.4.1'
 ]
-ext_modules = [
-    Extension(
-        'bquery.ctable_ext',
-        include_dirs=inc_dirs,
-        define_macros=def_macros,
-        sources=sources,
-        library_dirs=lib_dirs,
-        libraries=libs
-    )
+
+extensions = [
+    Extension("bquery.ctable_ext", ["bquery/ctable_ext.pyx"],
+              include_dirs=[abspath('bquery'), numpy.get_include()],
+              libraries=[],
+              library_dirs=[])
 ]
+ext_modules = cythonize(extensions)
+
 package_data = {'bquery': ['ctable_ext.pxd']}
 classifiers = [
         'Development Status :: 4 - Beta',
@@ -123,7 +106,7 @@ setup(
     license='MIT',
     platforms=['any'],
     ext_modules=ext_modules,
-    cmdclass=cmdclass,
+    cmdclass={'build_ext': build_ext},
     install_requires=install_requires,
     setup_requires=setup_requires,
     tests_require=tests_requires,

@@ -1,5 +1,6 @@
 cython
-numpy==1.16.4; python_version < '2.7'
+numpy==1.16.4; python_version <= '2.7'
 numpy; python_version > '3.3'
 bcolz
 pytest
+nose
