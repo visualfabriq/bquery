@@ -20,9 +20,9 @@ import numpy
 
 
 # Check this Python version is supported
-if any([v < (2, 6), (3,) < v < (3, 3)]):
+if any([v < (2, 6), (3,) < v < (3, 5)]):
     raise Exception("Unsupported Python version %d.%d. Requires Python >= 2.7 "
-                    "or >= 3.3." % v[:2])
+                    "or >= 3.5." % v[:2])
 
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -87,9 +87,9 @@ classifiers = [
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ]
 
 setup(
@@ -97,6 +97,7 @@ setup(
     version=get_version(),
     description='A query and aggregation framework for Bcolz',
     long_description=read("README.md"),
+    long_description_content_type='text/markdown',
     classifiers=classifiers,
     author='Carst Vaartjes',
     author_email='cvaartjes@visualfabriq.com',

@@ -2,6 +2,11 @@
 Release notes for bquery
 ========================
 
+Changes from 0.2.11 to 0.2.12
+=============================
+
+- Better handling of python 2 vs 3
+
 Changes from 0.2.10 to 0.2.11
 =============================
 
