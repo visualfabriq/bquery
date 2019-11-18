@@ -1,0 +1,57 @@
+version: 2
+jobs:
+  build27:
+    docker:
+      - image: circleci/python:2.7
+
+    working_directory: ~/bquery
+    steps:
+      - checkout:
+      - run:
+          name: Install Numpy
+          command: sudo pip install numpy==1.16.4
+      - run:
+          name: Install Requirements
+          command: sudo pip install -r requirements.txt
+      - run:
+          name: Install Module
+          command: python setup.py build_ext --inplace && sudo python setup.py install
+      - run:
+          name: Run Tests
+          command: pytest -vs bquery/tests/
+
+  build3:
+    docker:
+      - image: circleci/python:3.7.1
+
+    working_directory: ~/bquery
+    steps:
+      - checkout:
+      - run:
+          name: Install Requirements
+          command: sudo pip install -r requirements.txt
+      - run:
+          name: Install Module
+          command: python setup.py build_ext --inplace && sudo python setup.py install
+      - run:
+          name: Run Tests
+          command: pytest -vs bquery/tests/
+
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+      - build27
+      - build3
+
+  daily:
+    triggers:
+      - schedule:
+          cron: "0 10 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - build27
+      - build3
