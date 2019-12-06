@@ -2,6 +2,11 @@
 Release notes for bquery
 ========================
 
+Changes from 0.2.12 to 0.2.13
+=============================
+
+- Specify Minimum Build System Requirements (PEP518)
+
 Changes from 0.2.11 to 0.2.12
 =============================
 
