@@ -1,0 +1,20 @@
+[build-system]
+# Minimum requirements for the build system to execute.
+requires = [
+  "setuptools",
+  "cython>=0.22",  # Note: sync with setup.py
+  "numpy==1.16.4; python_version=='2.7'",
+  "numpy>=1.17.0; python_version>='3.6'",
+  "bcolz>=1.2.1"
+]
+
+[tool.black]
+target-version = ['py27', 'py35', 'py36', 'py37', 'py38']
+exclude = '''
+(
+  | \.egg
+  | \.git
+  | build
+  | setup.py
+)
+'''
