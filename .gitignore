@@ -63,3 +63,6 @@ bench-data.bcolz
 
 # Pycharm
 .idea
+
+# Vitrualenv
+/venv
