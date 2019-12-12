@@ -6,6 +6,7 @@ Changes from 0.2.13 to 0.2.14
 =============================
 
 - Raise numpy to v1.16.5 for python 2
+- Add wheel to build requirements
 
 Changes from 0.2.12 to 0.2.13
 =============================
