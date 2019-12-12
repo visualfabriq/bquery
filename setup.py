@@ -48,15 +48,15 @@ optional_libs = ['numexpr>=1.4.1']
 install_requires = [
     'pip>=8.1.2',
     'setuptools>=27.3',
-    'cython>=0.22',
+    'cython>=0.29.2',
     'bcolz>=1.2.1'
 ]
 setup_requires = []
 tests_requires = ['pytest', 'nose']
 if v < (3,):
     tests_requires.extend(['unittest2', 'mock'])
-    install_requires.extend(['numpy<=1.16.4'])
-    setup_requires.extend(['numpy<=1.16.4'])
+    install_requires.extend(['numpy<=1.16.5'])
+    setup_requires.extend(['numpy<=1.16.5'])
 else:
     install_requires.extend(['numpy'])
     setup_requires.extend(['numpy'])

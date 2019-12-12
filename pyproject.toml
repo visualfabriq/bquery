@@ -2,8 +2,9 @@
 # Minimum requirements for the build system to execute.
 requires = [
   "setuptools",
-  "cython>=0.22",  # Note: sync with setup.py
-  "numpy==1.16.4; python_version=='2.7'",
+  "wheel",
+  "cython>=0.29.2",  # Note: sync with setup.py
+  "numpy<=1.16.5; python_version=='2.7'",
   "numpy>=1.17.0; python_version>='3.6'",
   "bcolz>=1.2.1"
 ]
