@@ -8,10 +8,10 @@ def download_data(workdir):
     # wget https://storage.googleapis.com/tlc-trip-data/2015/yellow_tripdata_2015-01.csv
     for year in [2015]:
         for month in range(1, 13):
-            filename = 'yellow_tripdata_' + str(year) + '-' + ('0' + str(month))[-2:] + '.csv'
-            url = 'https://storage.googleapis.com/tlc-trip-data/' + str(year) + '/' + filename
+            filename  = 'yellow_tripdata_{0}-{1:02d}.csv'.format(year, month)
+            url = f'https://s3.amazonaws.com/nyc-tlc/trip+data/{filename}'
             print(url)
-            urllib.urlretrieve(url, workdir + '/' + filename)
+            urllib.request.urlretrieve(url, workdir + '/' + filename)
 
 
 def create_bcolz(workdir):
