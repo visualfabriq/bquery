@@ -1,6 +1,7 @@
 import urllib
 import glob
 import pandas as pd
+import dask.dataframe as dd
 from bquery import ctable
 import os
 
@@ -84,9 +85,13 @@ def create_bcolz(workdir):
             del temp_ct
             del import_df
 
+    print("Flushing ...")
     import_ct.flush()
 
+    print("Ctable ...")
     import_ct = ctable(rootdir=rootdir, mode='a')
+
+    print("Cache factor ...")
 
     import_ct.cache_factor([
         'dropoff_date',
@@ -112,12 +117,17 @@ def create_bcolz(workdir):
 
 
 def create_bcolz_chunks(workdir):
-    file_list = sorted(glob.glob(workdir + 'yellow_tripdata_*.csv'))
+    print(workdir)
+    csv_search_pattern = os.path.join(workdir, "yellow_tripdata_*.csv")
+    print("csv search pattern: {0}".format(csv_search_pattern))
+    file_list = sorted(glob.glob(csv_search_pattern))
     if not file_list:
         raise ValueError('No Files Found')
 
     for i, filename in enumerate(file_list):
-        rootdir = os.path.join(workdir, 'bcolz_chunk', 'taxi_{0}'.format(i))
+        rootdir = os.path.join(workdir, 'bcolz_chunks', 'taxi_{0}'.format(i))
+        if not os.path.exists(rootdir):
+            os.makedirs(rootdir)
         import_df = load_file(filename)
         import_ct = ctable.fromdataframe(import_df, rootdir=rootdir, expectedlen=len(import_df), mode='w')
         del import_df
@@ -147,3 +157,44 @@ def create_bcolz_chunks(workdir):
             'ratecodeid',
             'store_and_fwd_flag',
             'vendorid'])
+
+        
+def create_parquet(workdir):
+    """
+    Create parquet
+    
+    """
+    csv_search_pattern = os.path.join(workdir, "yellow_tripdata_*.csv")
+    print("csv search pattern: {0}".format(csv_search_pattern))
+    file_list = sorted(glob.glob(csv_search_pattern))
+    if not file_list:
+        raise ValueError('No Files Found')
+        
+    rootdir = os.path.join(workdir, 'parquet')
+    if not os.path.exists(rootdir):
+            os.makedirs(rootdir)
+            
+    measure_list = ['extra',
+                'fare_amount',
+                'improvement_surcharge',
+                'mta_tax',
+                'nr_rides',
+                'passenger_count',
+                'tip_amount',
+                'tolls_amount',
+                'total_amount',
+                'trip_distance']
+            
+    # csv file
+    output_dir_list = list()
+    for i, csv_file in enumerate(file_list):
+        import_df = load_file(csv_file)
+        ddf = dd.from_pandas(import_df, chunksize=400000)
+        #ddf.to_parquet(rootdir, engine='pyarrow', partition_on=['pickup_year', 'pickup_date'])
+        output_dir = os.path.join(rootdir, str(i))
+        ddf.to_parquet(output_dir, engine='fastparquet')
+        output_dir_list.append(output_dir)
+    return output_dir_list
+        
+        
+    
