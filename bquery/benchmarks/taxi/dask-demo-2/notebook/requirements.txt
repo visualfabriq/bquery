@@ -1,0 +1,9 @@
+boto3==1.13.21
+distributed==2.17.0
+jupyterlab==2.1.4
+dask-labextension==2.0.2
+graphviz==0.14
+gcsfs==0.6.2
+pandas==1.0.4
+dask[complete]==2.17.2
+ipywidgets==7.5.1
