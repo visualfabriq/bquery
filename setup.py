@@ -55,8 +55,8 @@ setup_requires = []
 tests_requires = ['pytest', 'nose']
 if v < (3,):
     tests_requires.extend(['unittest2', 'mock'])
-    install_requires.extend(['numpy<=1.16.5'])
-    setup_requires.extend(['numpy<=1.16.5'])
+    install_requires.extend(['numpy~=1.16'])
+    setup_requires.extend(['numpy~=1.16'])
 else:
     install_requires.extend(['numpy'])
     setup_requires.extend(['numpy'])
