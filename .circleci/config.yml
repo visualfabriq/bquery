@@ -1,8 +1,10 @@
 version: 2
 jobs:
   build3:
+    executor: codeartifact/default
     docker:
       - image: cimg/python:3.11
+        user: root
 
     working_directory: ~/bquery
     steps:
