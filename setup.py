@@ -20,9 +20,8 @@ import numpy
 
 
 # Check this Python version is supported
-if any([v < (2, 6), (3,) < v < (3, 5)]):
-    raise Exception("Unsupported Python version %d.%d. Requires Python >= 2.7 "
-                    "or >= 3.5." % v[:2])
+if v < (3, 11):
+    raise Exception("Unsupported Python version %d.%d. Requires Python >= 3.11" % v[:2])
 
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -49,17 +48,11 @@ install_requires = [
     'pip>=8.1.2',
     'setuptools>=27.3',
     'cython>=0.29.2',
-    'bcolz>=1.2.1'
+    'bcolz>=1.2.1',
+    'numpy>=2'
 ]
-setup_requires = []
+setup_requires = ['numpy']
 tests_requires = ['pytest', 'nose']
-if v < (3,):
-    tests_requires.extend(['unittest2', 'mock'])
-    install_requires.extend(['numpy<=1.16.5'])
-    setup_requires.extend(['numpy<=1.16.5'])
-else:
-    install_requires.extend(['numpy'])
-    setup_requires.extend(['numpy'])
 
 extras_requires = [
     'numexpr>=1.4.1'
@@ -84,12 +77,8 @@ classifiers = [
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Operating System :: Microsoft :: Windows',
         'Operating System :: Unix',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.11',
     ]
 
 setup(
