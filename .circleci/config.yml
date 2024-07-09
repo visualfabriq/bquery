@@ -11,8 +11,7 @@ jobs:
       - checkout
       - run:
           name: Install dependencies
-          command: |
-            ~/venv/bin/pip install .[test]
+          command: pip install .[test]
 #      - run:
 #          name: Install Module
 #          command: python setup.py build_ext --inplace && sudo python setup.py install
