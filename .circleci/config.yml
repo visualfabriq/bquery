@@ -8,11 +8,12 @@ jobs:
     steps:
       - checkout:
       - run:
-          name: Install Requirements
-          command: sudo pip install -r requirements.txt
-      - run:
-          name: Install Module
-          command: python setup.py build_ext --inplace && sudo python setup.py install
+          name: Install dependencies
+          command: |
+            ~/venv/bin/pip install .[test]
+#      - run:
+#          name: Install Module
+#          command: python setup.py build_ext --inplace && sudo python setup.py install
       - run:
           name: Run Tests
           command: pytest -vs bquery/tests/
