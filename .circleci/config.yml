@@ -6,7 +6,7 @@ jobs:
 
     working_directory: ~/bquery
     steps:
-      - checkout:
+      - checkout
       - run:
           name: Install dependencies
           command: |
